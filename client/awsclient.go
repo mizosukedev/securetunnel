@@ -3,17 +3,22 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/url"
+	"securetunnel/log"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 const (
-	queryKeyProxyMode    = "local-proxy-mode"
-	subProtocolV2        = "aws.iot.securetunneling-2.0"
-	headerKeyAccessToken = "access-token"
+	queryKeyProxyMode        = "local-proxy-mode"
+	subProtocolV2            = "aws.iot.securetunneling-2.0"
+	headerKeyAccessToken     = "access-token"
+	headerKeyStatusReason    = "X-Status-Reason"
+	statusReasonTunnelClosed = "Tunnel is closed"
+	maxWebSocketFrameSize    = 131076
 )
 
 var (
@@ -174,6 +179,48 @@ func (client *awsClient) Run(ctx context.Context) error {
 	return nil
 }
 
+func (client *awsClient) connect(ctx context.Context) error {
+
+	dialCtx, cancel := context.WithTimeout(ctx, client.dialTimeout)
+	defer cancel()
+
+	con, response, err := client.dialer.DialContext(
+		dialCtx,
+		client.endpoint.String(),
+		client.requestHeader)
+
+	if err != nil {
+		err = &connectError{
+			causeErr: err,
+			url:      client.endpoint,
+			response: response,
+		}
+		return err
+	}
+
+	log.Infof("Connected to secure tunneling service. url=%v", client.endpoint)
+
+	if response != nil {
+		log.Info("Response headers:")
+		for key, value := range response.Header {
+			log.Infof("  %s=%v", key, value)
+		}
+	}
+
+	// WebSocket frames of up to 131076 bytes may be sent to clients
+	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#websocket-subprotocol-awsiotsecuretunneling-20
+	con.SetReadLimit(maxWebSocketFrameSize)
+
+	con.SetCloseHandler(func(code int, text string) error {
+		log.Warnf("close websocket connection from server. code=%d error=%s", code, text)
+		return nil
+	})
+
+	client.con = con
+
+	return nil
+}
+
 // SendStreamStart Refer to AWSClient.
 func (client *awsClient) SendStreamStart(streamID int32, serviceID string) error {
 
@@ -190,4 +237,59 @@ func (client *awsClient) SendStreamReset(streamID int32, serviceID string) error
 func (client *awsClient) SendData(streamID int32, serviceID string, data []byte) error {
 
 	return nil
+}
+
+// connectError is a structure that represents connection error to endpoint.
+type connectError struct {
+	causeErr error
+	url      *url.URL
+	response *http.Response
+}
+
+// Error is an implementation of the error interface.
+func (conErr *connectError) Error() string {
+
+	var responseHeader http.Header
+	if conErr.response != nil {
+		responseHeader = conErr.response.Header
+	}
+
+	message := fmt.Sprintf(
+		"failed to connect. url=%v header=%v cause=%v",
+		conErr.url,
+		responseHeader,
+		conErr.causeErr)
+
+	return message
+}
+
+// tunnelClosed returns whether the tunnel is closed.
+func (conErr *connectError) tunnelClosed() bool {
+
+	if conErr.response != nil {
+		status := conErr.response.Header.Get(headerKeyStatusReason)
+		result := (status == statusReasonTunnelClosed)
+		return result
+	}
+
+	return false
+}
+
+// retryable returns whether it is an error that can be reconected.
+// 	- response status 400 - 499
+// 	- tunnel is closed
+// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#handshake-error-responses
+func (conErr *connectError) retryable() bool {
+
+	if conErr.response != nil {
+		statusCode := conErr.response.StatusCode
+
+		if 400 <= statusCode && statusCode < 500 {
+			return false
+		}
+	}
+
+	retryable := conErr.tunnelClosed()
+
+	return retryable
 }
