@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"securetunnel/log"
+	sync "sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -161,6 +162,7 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 		connectHandlers:   options.ConnectHandlers,
 		dialer:            dialer,
 		requestHeader:     requestHeader,
+		writeMutex:        &sync.Mutex{},
 	}
 
 	return instance, nil
@@ -179,6 +181,7 @@ type awsClient struct {
 	dialer            *websocket.Dialer
 	requestHeader     http.Header
 	con               *websocket.Conn
+	writeMutex        *sync.Mutex // for websocket.WriteMessage()
 }
 
 // Run Refer to AWSClient.
@@ -575,17 +578,69 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 // SendStreamStart Refer to AWSClient.
 func (client *awsClient) SendStreamStart(streamID int32, serviceID string) error {
 
-	return nil
+	log.Infof("Send StreamStart message StreamID=%d ServiceID=%s", streamID, serviceID)
+
+	err := client.sendMessage(streamID, serviceID, Message_STREAM_START, nil)
+	return err
 }
 
 // SendStreamReset Refer to AWSClient.
 func (client *awsClient) SendStreamReset(streamID int32, serviceID string) error {
 
-	return nil
+	log.Warnf("Send StreamReset message StreamID=%d ServiceID=%s", streamID, serviceID)
+
+	err := client.sendMessage(streamID, serviceID, Message_STREAM_RESET, nil)
+	return err
 }
 
 // SendData Refer to AWSClient.
 func (client *awsClient) SendData(streamID int32, serviceID string, data []byte) error {
+
+	log.Debugf("SendData StreamID=%d", streamID)
+
+	err := client.sendMessage(streamID, serviceID, Message_DATA, data)
+	return err
+}
+
+// sendMessage send secure tunneling message.
+func (client *awsClient) sendMessage(
+	streamID int32,
+	serviceID string,
+	messageType Message_Type,
+	data []byte) error {
+
+	client.writeMutex.Lock()
+	defer client.writeMutex.Unlock()
+
+	// TODO: Should large messages be split and sent?
+
+	message := &Message{
+		StreamId:  streamID,
+		ServiceId: serviceID,
+		Type:      messageType,
+		Payload:   data,
+	}
+
+	// serialize message
+	messageBin, err := proto.Marshal(message)
+	if err != nil {
+		err = fmt.Errorf("failed to serialize message: %w", err)
+		return err
+	}
+
+	// size
+	sizeBin := make([]byte, sizeOfMessageSize)
+	binary.BigEndian.PutUint16(sizeBin, uint16(len(messageBin)))
+
+	// format message size+message
+	messageBin = append(sizeBin, messageBin...)
+
+	// send
+	err = client.con.WriteMessage(websocket.BinaryMessage, messageBin)
+	if err != nil {
+		err = fmt.Errorf("failed to send websocket message: %w", err)
+		return err
+	}
 
 	return nil
 }
