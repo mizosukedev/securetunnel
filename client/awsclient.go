@@ -1,8 +1,11 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -18,6 +22,7 @@ const (
 	headerKeyAccessToken     = "access-token"
 	headerKeyStatusReason    = "X-Status-Reason"
 	statusReasonTunnelClosed = "Tunnel is closed"
+	sizeOfMessageSize        = 2
 	maxWebSocketFrameSize    = 131076
 	pingTimeout              = time.Second * 3
 )
@@ -252,6 +257,221 @@ func (client *awsClient) keepSendingPing(ctx context.Context) {
 			}
 		}
 
+	}
+
+}
+
+// keepReadingMessages keep reading message frames,
+// and fire event handlers associated with AWSClientOptions.MessageListeners.
+func (client *awsClient) keepReadingMessages(ctx context.Context) error {
+
+	for {
+
+		select {
+
+		case <-ctx.Done():
+			return ctx.Err()
+
+		default:
+
+			messages, err := client.readMessages()
+			if err != nil {
+				return err
+			}
+
+			for _, message := range messages {
+				for _, handler := range client.messageListeners {
+					client.invokeEvent(handler, message)
+				}
+			}
+
+		}
+	}
+}
+
+// readMessages read websocket frames, and deserialize.
+func (client *awsClient) readMessages() ([]*Message, error) {
+
+	// A WebSocket frame may contain multiple tunneling frames,
+	// **or it may contain only a slice of a tunneling frame started
+	// in a previous WebSocket frame and will finish in a later WebSocket frame.**
+	// This means that processing the WebSocket data must be done
+	// as pure a sequence of bytes that sequentially construct tunneling frames
+	// regardless of what the WebSocket fragmentation is.
+	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#tunneling-message-frames
+
+	// message -> secure tunnel message(protbuf message)
+	// wsMessage -> websocket message
+
+	prevMessageBin := []byte(nil)
+	restMessageSize := uint16(0)
+	messages := make([]*Message, 0, 1)
+
+	// loop to read websocket frame.
+	for {
+
+		wsMessageType, wsMessage, err := client.con.ReadMessage()
+		if err != nil {
+			return nil, err
+		}
+
+		// This protocol operates entirely with binary messages.
+		// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#websocket-subprotocol-awsiotsecuretunneling-20
+		if wsMessageType != websocket.BinaryMessage {
+			return nil, errors.New("only binary messages can be accepted")
+		}
+
+		reader := bytes.NewReader(wsMessage)
+
+		// loop to deserialize data -> to Message struct
+		for {
+			// |-----------------------------------------------------------------|
+			// | 2-byte data length   |     N byte ProtocolBuffers message       |
+			// |-----------------------------------------------------------------|
+			// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#tunneling-message-frames
+
+			var messageSize uint16
+
+			if restMessageSize == 0 {
+				// message size
+				messageSizeBin := make([]byte, sizeOfMessageSize)
+				_, err := reader.Read(messageSizeBin)
+				if err != nil {
+					err = fmt.Errorf("failed to read message size in websocket frame: %w", err)
+					return nil, err
+				}
+				messageSize = binary.BigEndian.Uint16(messageSizeBin)
+			} else {
+				// Continuation from the previous websocket frame.
+				messageSize = restMessageSize
+			}
+
+			// The entire binary of the message does not exist in this websocket frame.
+			// The next message contains the remaining binaries.
+			if reader.Len() < int(messageSize) {
+				messageBin := make([]byte, reader.Len())
+				readSize, err := reader.Read(messageBin)
+				if err != nil {
+					err = fmt.Errorf("failed to read partial message in websocket frame: %w", err)
+					return nil, err
+				}
+
+				prevMessageBin = append(prevMessageBin, messageBin...)
+				restMessageSize = messageSize - uint16(readSize)
+
+				// next websocket.Conn.ReadMessage()
+				break
+			}
+
+			// The last websocket frame for building a protobuf message.
+
+			// binary protobuf message
+			messageBin := make([]byte, messageSize)
+			_, err = reader.Read(messageBin)
+			if err != nil {
+				err = fmt.Errorf("failed to read message in websocket frame: %w", err)
+				return nil, err
+			}
+
+			if prevMessageBin != nil {
+				messageBin = append(prevMessageBin, messageBin...)
+			}
+
+			prevMessageBin = nil
+			restMessageSize = 0
+
+			// deserialize
+			message := &Message{}
+			err = proto.Unmarshal(messageBin, message)
+			if err != nil {
+				err = fmt.Errorf("invalid protobuf message format: %w", err)
+				return nil, err
+			}
+
+			messages = append(messages, message)
+
+			// EOF
+			if reader.Len() == 0 {
+				return messages, nil
+			}
+		}
+	}
+}
+
+// invokeEvent invoke the appropriate event handler in AWSMessageListener according to the type of message.
+func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message *Message) {
+
+	switch message.Type {
+
+	case Message_STREAM_START:
+
+		log.Infof(
+			"received StreamStart message -> StreamID=StreamID=%d ServiceID=%s",
+			message.StreamId,
+			message.ServiceId)
+
+		err := messageListener.OnStreamStart(message)
+		if err != nil {
+			log.Errorf(
+				"OnStreamStart event failed -> StreamID=%d ServiceID=%s: %v",
+				message.StreamId,
+				message.ServiceId,
+				err)
+
+			err = client.SendStreamReset(message.StreamId, message.ServiceId)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+
+	case Message_DATA:
+
+		log.Debugf("received Data message StreamID=%d ServiceID=%s", message.StreamId, message.ServiceId)
+
+		err := messageListener.OnReceivedData(message)
+		if err != nil {
+			log.Errorf(
+				"OnReceivedData event failed -> StreamID=%d ServiceID=%s: %v",
+				message.StreamId,
+				message.ServiceId,
+				err)
+
+			err = client.SendStreamReset(message.StreamId, message.ServiceId)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+
+	case Message_STREAM_RESET:
+
+		log.Warnf(
+			"received StreamReset message -> StreamID=StreamID=%d ServiceID=%s",
+			message.StreamId,
+			message.ServiceId)
+
+		messageListener.OnStreamReset(message)
+
+	case Message_SESSION_RESET:
+		log.Warn("Received SessionReset message")
+		messageListener.OnSessionReset(message)
+
+	case Message_SERVICE_IDS:
+
+		log.Infof("Received ServiceIDs message ServiceID=%s", message.AvailableServiceIds)
+
+		err := messageListener.OnReceivedServiceIDs(message)
+		if err != nil {
+			log.Errorf("OnReceivedServiceIDs() event failed: %v", err)
+		}
+
+	case Message_UNKNOWN:
+		fallthrough
+	default:
+		log.Errorf(
+			"Invalid message was received -> StreamID=%d MessageType=%d Payload=%v",
+			message.StreamId,
+			message.Type,
+			message.Payload)
 	}
 
 }
