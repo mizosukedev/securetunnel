@@ -2,6 +2,24 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
+	"net/url"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+const (
+	queryKeyProxyMode    = "local-proxy-mode"
+	subProtocolV2        = "aws.iot.securetunneling-2.0"
+	headerKeyAccessToken = "access-token"
+)
+
+var (
+	subProtocols = []string{
+		subProtocolV2,
+	}
 )
 
 // AWSMessageListener is an interface representing event handlers to be fired
@@ -62,17 +80,92 @@ type AWSClient interface {
 
 // AWSClientOptions is options of AWSClient.
 type AWSClientOptions struct {
+
+	// Mode represents local proxy mode.
+	Mode Mode
+
+	// Endpoint represents service endpoint.
+	Endpoint *url.URL
+
+	// Token represents token in the return value of AWS OpenTunnel WebAPI.
+	Token string
+
+	// TLSConfig If you want to customize tls.Config, set the value. Otherwise it sets null.
+	TLSConfig *tls.Config
+
+	// DialTimeout sets the timeout value when connecting to websocket.
+	DialTimeout time.Duration
+
+	// ReconnectInterval represents the interval when reconnecting.
+	ReconnectInterval time.Duration
+
+	// PingInterval represents the interval when sending ping.
+	PingInterval time.Duration
+
+	// MessageListeners represents instances which implement AWSMessageListener interface.
+	MessageListeners []AWSMessageListener
+
+	// ConnectHandlers are event handlers to be fired
+	// when the connection to the service is successful.
+	// This event handlers also are fired on reconnection.
+	// TODO: think arguments.
+	ConnectHandlers []func()
 }
 
 // NewAWSClient returns a instance which implements AWSClient.
 func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 
-	instance := &awsClient{}
+	// clone url
+	endpoint, _ := url.Parse(options.Endpoint.String())
+
+	// create query parameter -> wss://xxx.xxx/xxx?local-proxy-mode=destination or source
+	query := endpoint.Query()
+	query.Add(queryKeyProxyMode, string(options.Mode))
+	endpoint.RawQuery = query.Encode()
+
+	tlsConfig := options.TLSConfig
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	}
+
+	cloneDefaultDialer := *websocket.DefaultDialer
+	dialer := &cloneDefaultDialer
+	dialer.TLSClientConfig = tlsConfig
+	dialer.Subprotocols = subProtocols
+
+	requestHeader := http.Header{
+		headerKeyAccessToken: []string{options.Token},
+	}
+
+	instance := &awsClient{
+		mode:              options.Mode,
+		endpoint:          endpoint,
+		token:             options.Token,
+		dialTimeout:       options.DialTimeout,
+		reconnectInterval: options.ReconnectInterval,
+		pingInterval:      options.PingInterval,
+		messageListeners:  options.MessageListeners,
+		connectHandlers:   options.ConnectHandlers,
+		dialer:            dialer,
+		requestHeader:     requestHeader,
+	}
+
 	return instance, nil
 }
 
 // awsClient is a structure that implements AWSClient interface.
 type awsClient struct {
+	mode              Mode
+	endpoint          *url.URL
+	token             string
+	dialTimeout       time.Duration
+	reconnectInterval time.Duration
+	pingInterval      time.Duration
+	messageListeners  []AWSMessageListener
+	connectHandlers   []func()
+	dialer            *websocket.Dialer
+	requestHeader     http.Header
+	con               *websocket.Conn
 }
 
 // Run Refer to AWSClient.
