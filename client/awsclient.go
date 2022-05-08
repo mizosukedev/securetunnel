@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"securetunnel/log"
-	sync "sync"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mizosukedev/securetunnel/log"
 	"google.golang.org/protobuf/proto"
 )
 
