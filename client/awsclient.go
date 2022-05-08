@@ -19,6 +19,7 @@ const (
 	headerKeyStatusReason    = "X-Status-Reason"
 	statusReasonTunnelClosed = "Tunnel is closed"
 	maxWebSocketFrameSize    = 131076
+	pingTimeout              = time.Second * 3
 )
 
 var (
@@ -219,6 +220,40 @@ func (client *awsClient) connect(ctx context.Context) error {
 	client.con = con
 
 	return nil
+}
+
+// keepSendingPing keep sending ping frame.
+// If failed to send ping frame, continue sending ping.
+func (client *awsClient) keepSendingPing(ctx context.Context) {
+
+	client.con.SetPongHandler(func(appData string) error {
+		return nil
+	})
+
+	ticker := time.NewTicker(client.pingInterval)
+	defer ticker.Stop()
+
+	for {
+
+		select {
+
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			now := time.Now()
+			message := now.Format("2006-01-02T15:04:05")
+			timeout := now.Add(pingTimeout)
+
+			err := client.con.WriteControl(websocket.PingMessage, []byte(message), timeout)
+			if err != nil {
+				log.Errorf("failed to send ping frame: %v", err)
+				// continue sending ping
+			}
+		}
+
+	}
+
 }
 
 // SendStreamStart Refer to AWSClient.
