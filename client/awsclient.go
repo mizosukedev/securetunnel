@@ -31,6 +31,8 @@ var (
 	subProtocols = []string{
 		subProtocolV2,
 	}
+
+	ErrTunnelClosed = errors.New("Tunnel is closed")
 )
 
 // AWSMessageListener is an interface representing event handlers to be fired
@@ -182,7 +184,39 @@ type awsClient struct {
 // Run Refer to AWSClient.
 func (client *awsClient) Run(ctx context.Context) error {
 
-	return nil
+	for {
+
+		err := client.start(ctx)
+
+		if err != nil {
+			if conErr, ok := err.(*connectError); ok {
+				// tunnel is closed
+				if conErr.tunnelClosed() {
+					return ErrTunnelClosed
+				}
+
+				// can not retry
+				if !conErr.retryable() {
+					return conErr
+				}
+			}
+
+			// caller context is done
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return nil
+			}
+
+			log.Warnf("Retryable connection error occur. %v", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(client.reconnectInterval):
+		}
+
+	}
+
 }
 
 func (client *awsClient) start(ctx context.Context) error {
