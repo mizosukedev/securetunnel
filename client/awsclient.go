@@ -185,6 +185,68 @@ func (client *awsClient) Run(ctx context.Context) error {
 	return nil
 }
 
+func (client *awsClient) start(ctx context.Context) error {
+
+	err := client.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, connectHandler := range client.connectHandlers {
+		connectHandler()
+	}
+
+	// TODO:need disconnect handler? defer for { disconnectHandler() }
+
+	// -----------------------
+	//  successful connection
+	// -----------------------
+
+	innerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// start thread for sending ping.
+	chanSendPingTerminate := make(chan struct{}, 1)
+	go func() {
+		client.keepSendingPing(innerCtx)
+		close(chanSendPingTerminate)
+	}()
+
+	// start thread for reading messages.
+	chanReadMessageResult := make(chan error, 1)
+	go func() {
+		// When this thread terminates, it terminates the sending ping thread.
+		defer cancel()
+		chanReadMessageResult <- client.keepReadingMessages(innerCtx)
+	}()
+
+	select {
+	// caller context is done.
+	case <-ctx.Done():
+		// If connection is not closed, keepReadingMessages() will not be able to
+		// exit the loop even if context is done.
+		closeErr := client.close(websocket.CloseNormalClosure, "normal closure")
+		if closeErr != nil {
+			log.Error(closeErr)
+		}
+
+		// wait for reading thread to terminate.
+		<-chanReadMessageResult
+		err = ctx.Err()
+	// reading messages error.
+	case err = <-chanReadMessageResult:
+		closeErr := client.close(websocket.CloseNormalClosure, "normal closure")
+		if closeErr != nil {
+			log.Error(closeErr)
+		}
+	}
+
+	// wait for sending ping thread to terminate.
+	<-chanSendPingTerminate
+
+	return err
+}
+
 func (client *awsClient) connect(ctx context.Context) error {
 
 	dialCtx, cancel := context.WithTimeout(ctx, client.dialTimeout)
@@ -490,6 +552,26 @@ func (client *awsClient) SendStreamReset(streamID int32, serviceID string) error
 
 // SendData Refer to AWSClient.
 func (client *awsClient) SendData(streamID int32, serviceID string, data []byte) error {
+
+	return nil
+}
+
+// close send websocket close message and disconnect from server.
+func (client *awsClient) close(closeCode int, text string) error {
+
+	message := websocket.FormatCloseMessage(closeCode, text)
+	timeout := time.Now().Add(time.Second)
+	err := client.con.WriteControl(websocket.CloseMessage, message, timeout)
+	if err != nil {
+		err = fmt.Errorf("failed to close connection: %w", err)
+		return err
+	}
+
+	err = client.con.Close()
+	if err != nil {
+		err = fmt.Errorf("failed to close connection: %w", err)
+		return err
+	}
 
 	return nil
 }
