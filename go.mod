@@ -1,4 +1,4 @@
-module securetunnel
+module github.com/mizosukedev/securetunnel
 
 go 1.18
 
