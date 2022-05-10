@@ -26,6 +26,8 @@ const (
 	sizeOfMessageSize        = 2
 	maxWebSocketFrameSize    = 131076
 	pingTimeout              = time.Second * 3
+
+	channelBufSizePerStreamID = 10
 )
 
 var (
@@ -38,6 +40,7 @@ var (
 
 // AWSMessageListener is an interface representing event handlers to be fired
 // when localproxy received message from secure tunneling service.
+// AWSClient generates one goroutine for each StreamID to process the message.
 type AWSMessageListener interface {
 
 	// OnStreamStart is an event handler that fires when a StreamStart message is received.
@@ -151,6 +154,12 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 		headerKeyAccessToken: []string{options.Token},
 	}
 
+	workerMng := &workerManager{
+		workerMap: map[int32]*Worker{},
+		rwMutex:   &sync.RWMutex{},
+		bufSize:   channelBufSizePerStreamID,
+	}
+
 	instance := &awsClient{
 		mode:              options.Mode,
 		endpoint:          endpoint,
@@ -163,6 +172,7 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 		dialer:            dialer,
 		requestHeader:     requestHeader,
 		writeMutex:        &sync.Mutex{},
+		workerMng:         workerMng,
 	}
 
 	return instance, nil
@@ -182,6 +192,7 @@ type awsClient struct {
 	requestHeader     http.Header
 	con               *websocket.Conn
 	writeMutex        *sync.Mutex // for websocket.WriteMessage()
+	workerMng         *workerManager
 }
 
 // Run Refer to AWSClient.
@@ -280,6 +291,9 @@ func (client *awsClient) start(ctx context.Context) error {
 
 	// wait for sending ping thread to terminate.
 	<-chanSendPingTerminate
+
+	// stop all Worker
+	client.workerMng.stopAll()
 
 	return err
 }
@@ -509,6 +523,8 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 			message.StreamId,
 			message.ServiceId)
 
+		client.workerMng.start(message.StreamId)
+
 		err := messageListener.OnStreamStart(message)
 		if err != nil {
 			log.Errorf(
@@ -527,19 +543,22 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 
 		log.Debugf("received Data message StreamID=%d ServiceID=%s", message.StreamId, message.ServiceId)
 
-		err := messageListener.OnReceivedData(message)
-		if err != nil {
-			log.Errorf(
-				"OnReceivedData event failed -> StreamID=%d ServiceID=%s: %v",
-				message.StreamId,
-				message.ServiceId,
-				err)
+		client.workerMng.exec(message.StreamId, func(context.Context) {
 
-			err = client.SendStreamReset(message.StreamId, message.ServiceId)
+			err := messageListener.OnReceivedData(message)
 			if err != nil {
-				log.Error(err)
+				log.Errorf(
+					"OnReceivedData event failed -> StreamID=%d ServiceID=%s: %v",
+					message.StreamId,
+					message.ServiceId,
+					err)
+
+				err = client.SendStreamReset(message.StreamId, message.ServiceId)
+				if err != nil {
+					log.Error(err)
+				}
 			}
-		}
+		})
 
 	case Message_STREAM_RESET:
 
@@ -548,7 +567,10 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 			message.StreamId,
 			message.ServiceId)
 
-		messageListener.OnStreamReset(message)
+		client.workerMng.exec(message.StreamId, func(context.Context) {
+			messageListener.OnStreamReset(message)
+			client.workerMng.stop(message.StreamId)
+		})
 
 	case Message_SESSION_RESET:
 		log.Warn("Received SessionReset message")
@@ -580,8 +602,16 @@ func (client *awsClient) SendStreamStart(streamID int32, serviceID string) error
 
 	log.Infof("Send StreamStart message StreamID=%d ServiceID=%s", streamID, serviceID)
 
+	client.workerMng.start(streamID)
+
 	err := client.sendMessage(streamID, serviceID, Message_STREAM_START, nil)
-	return err
+	if err != nil {
+		client.workerMng.stop(streamID)
+		err = fmt.Errorf("failed to send StreamStart message: %w", err)
+		return err
+	}
+
+	return nil
 }
 
 // SendStreamReset Refer to AWSClient.
@@ -589,8 +619,15 @@ func (client *awsClient) SendStreamReset(streamID int32, serviceID string) error
 
 	log.Warnf("Send StreamReset message StreamID=%d ServiceID=%s", streamID, serviceID)
 
+	client.workerMng.stop(streamID)
+
 	err := client.sendMessage(streamID, serviceID, Message_STREAM_RESET, nil)
-	return err
+	if err != nil {
+		err = fmt.Errorf("failed to send StreamReset message: %w", err)
+		return err
+	}
+
+	return nil
 }
 
 // SendData Refer to AWSClient.
@@ -599,7 +636,12 @@ func (client *awsClient) SendData(streamID int32, serviceID string, data []byte)
 	log.Debugf("SendData StreamID=%d", streamID)
 
 	err := client.sendMessage(streamID, serviceID, Message_DATA, data)
-	return err
+	if err != nil {
+		err = fmt.Errorf("failed to send Data message: %w", err)
+		return err
+	}
+
+	return nil
 }
 
 // sendMessage send secure tunneling message.
