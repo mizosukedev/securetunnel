@@ -107,7 +107,7 @@ type AWSClientOptions struct {
 	// TLSConfig If you want to customize tls.Config, set the value. Otherwise it sets null.
 	TLSConfig *tls.Config
 
-	// DialTimeout sets the timeout value when connecting to websocket.
+	// DialTimeout sets the timeout value when connecting to the service.
 	DialTimeout time.Duration
 
 	// ReconnectInterval represents the interval when reconnecting.
