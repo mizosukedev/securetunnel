@@ -16,7 +16,7 @@ func TestWorker(t *testing.T) {
 }
 
 // TestWorkerNormal confirm the operation when Worker is used normally.
-func (suite *WorkerTest) TestWorkerNormal() {
+func (suite *WorkerTest) TestNormal() {
 
 	bufSize := 10
 	functionCount := 100
@@ -47,7 +47,8 @@ func (suite *WorkerTest) TestWorkerNormal() {
 	worker.Stop()
 }
 
-func (suite *WorkerTest) TestWorkerContextCancel() {
+// TestContextCancel confirm that Worker stop if context is canceled.
+func (suite *WorkerTest) TestContextCancel() {
 
 	worker := NewWorker(10)
 
