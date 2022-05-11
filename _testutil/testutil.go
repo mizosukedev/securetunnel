@@ -49,12 +49,15 @@ func StartTCPServer(ctx context.Context, handler func(net.Conn)) (net.Listener, 
 
 	go func() {
 
-		con, err := listener.Accept()
-		if err != nil {
-			return
+		for {
+			con, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			go handler(con)
 		}
 
-		go handler(con)
 	}()
 
 	return listener, nil
