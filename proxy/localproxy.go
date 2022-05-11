@@ -197,15 +197,15 @@ func (listener *eventLisnter) OnSessionReset(message *client.Message) {
 	listener.localProxy.socketManager.StopAll()
 }
 
-// OnReceivedData Refer to AWSMeesageListener.OnReceivedData
-func (listener *eventLisnter) OnReceivedData(message *client.Message) error {
+// OnData Refer to AWSMeesageListener.OnData
+func (listener *eventLisnter) OnData(message *client.Message) error {
 
 	err := listener.localProxy.socketManager.Write(message.StreamId, message.ServiceId, message.Payload)
 	return err
 }
 
-// OnReceivedServiceIDs Refer to AWSMeesageListener.OnReceivedServiceIDs
-func (listener *eventLisnter) OnReceivedServiceIDs(message *client.Message) error {
+// OnServiceIDs Refer to AWSMeesageListener.OnServiceIDs
+func (listener *eventLisnter) OnServiceIDs(message *client.Message) error {
 
 	if listener.localProxy.mode == client.ModeSource {
 
