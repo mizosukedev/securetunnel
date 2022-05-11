@@ -3,10 +3,13 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"net"
 	"net/url"
 	"time"
 
 	"github.com/mizosukedev/securetunnel/client"
+	"github.com/mizosukedev/securetunnel/log"
 )
 
 // LocalProxyOptions represents options of LocalProxy.
@@ -43,6 +46,57 @@ type LocalProxyOptions struct {
 
 // LocalProxy represents localproxy in aws secure tunneling service.
 type LocalProxy struct {
+	mode             client.Mode
+	localDialTimeout time.Duration
+	awsClient        client.AWSClient
+	socketManager    *LocalSocketManager
+	serviceMap       map[string]ServiceConfig // [ServiceID]*ServiceConfig
+}
+
+// NewLocalProxy returns a LocalProxy instance.
+func NewLocalProxy(options LocalProxyOptions) (*LocalProxy, error) {
+
+	// map[ServiceID]
+	serviceMap := map[string]ServiceConfig{}
+
+	for _, config := range options.ServiceConfigs {
+
+		serviceMap[config.ServiceID] = config
+	}
+
+	localProxy := &LocalProxy{
+		mode:             options.Mode,
+		localDialTimeout: options.LocalDialTimeout,
+		serviceMap:       serviceMap,
+	}
+
+	listener := &eventLisnter{
+		localProxy: localProxy,
+	}
+
+	awsClientOptions := client.AWSClientOptions{
+		Mode:              options.Mode,
+		Endpoint:          options.Endpoint,
+		Token:             options.Token,
+		TLSConfig:         options.TLSConfig,
+		DialTimeout:       options.EndpointDialTimeout,
+		ReconnectInterval: options.EndpointReconnectInterval,
+		PingInterval:      options.PingInterval,
+		MessageListeners:  []client.AWSMessageListener{listener},
+		ConnectHandlers:   []func(){listener.OnConnected},
+	}
+
+	awsClient, err := client.NewAWSClient(awsClientOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	socketManager := NewLocalSocketManager(listener)
+
+	localProxy.awsClient = awsClient
+	localProxy.socketManager = socketManager
+
+	return localProxy, err
 }
 
 // Run the fllowing.
@@ -61,5 +115,112 @@ type LocalProxy struct {
 // 	- http response status code is 400-499, when connecting to AWS.
 // 	- Tunnel is closed.
 func (proxy *LocalProxy) Run(ctx context.Context) error {
+
+	// connect to aws.
+	err := proxy.awsClient.Run(ctx)
+
+	// cleanup local connections.
+	proxy.socketManager.StopAll()
+
+	return err
+}
+
+// eventListener is a struct that implements AWSMessageListener, SocketReader
+// and a few other interfaces.
+type eventLisnter struct {
+	localProxy *LocalProxy
+}
+
+// --------------------------------------------
+//  AWSClient OnConnected
+// --------------------------------------------
+
+// OnConnected is a method that is executed when the connection to AWS is successful.
+func (listener *eventLisnter) OnConnected() {
+
+	// Drops the existing connections when reconnecting.
+	listener.localProxy.socketManager.StopAll()
+}
+
+// --------------------------------------------
+//  AWSMessageListener members
+//  Fired when messages are received from AWS
+// --------------------------------------------
+
+// OnStreamStart Refer to AWSMeesageListener.OnStreamStart
+func (listener *eventLisnter) OnStreamStart(message *client.Message) error {
+
+	svcConfig, ok := listener.localProxy.serviceMap[message.ServiceId]
+	if !ok {
+		err := fmt.Errorf("unknown serviceID. serviceID=%s", message.ServiceId)
+		return err
+	}
+
+	con, err := net.DialTimeout(
+		svcConfig.Network,
+		svcConfig.Address,
+		listener.localProxy.localDialTimeout)
+
+	if err != nil {
+		err = fmt.Errorf("failed to connect to local service. service=%v: %w", svcConfig, err)
+		return err
+	}
+
+	err = listener.localProxy.socketManager.StartSocket(message.StreamId, message.ServiceId, con)
+
+	return err
+}
+
+// OnStreamReset Refer to AWSMeesageListener.OnStreamReset
+func (listener *eventLisnter) OnStreamReset(message *client.Message) {
+
+	listener.localProxy.socketManager.StopSocket(message.StreamId)
+}
+
+// OnSessionReset Refer to AWSMeesageListener.OnSessionReset
+func (listener *eventLisnter) OnSessionReset(message *client.Message) {
+
+	listener.localProxy.socketManager.StopAll()
+}
+
+// OnReceivedData Refer to AWSMeesageListener.OnReceivedData
+func (listener *eventLisnter) OnReceivedData(message *client.Message) error {
+
+	err := listener.localProxy.socketManager.Write(message.StreamId, message.ServiceId, message.Payload)
+	return err
+}
+
+// OnReceivedServiceIDs Refer to AWSMeesageListener.OnReceivedServiceIDs
+func (listener *eventLisnter) OnReceivedServiceIDs(message *client.Message) error {
+
+	// In source mode, start server listening.
+
 	return nil
+}
+
+// --------------------------------------------
+//  SocketReader members
+//  Fired when datas are read from local socket.
+// --------------------------------------------
+
+// OnReadData Refer to SocketReader.OnReadData
+func (listener *eventLisnter) OnReadData(
+	streamID int32,
+	serviceID string,
+	data []byte) error {
+
+	err := listener.localProxy.awsClient.SendData(streamID, serviceID, data)
+	return err
+}
+
+// OnReadError Refer to SocketReader.OnReadError
+func (listener *eventLisnter) OnReadError(
+	streamID int32,
+	serviceID string,
+	err error) {
+
+	resetErr := listener.localProxy.awsClient.SendStreamReset(streamID, serviceID)
+	if resetErr != nil {
+		log.Error(resetErr)
+	}
 }
