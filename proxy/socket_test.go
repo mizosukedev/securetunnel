@@ -22,8 +22,8 @@ func TestLocalSocket(t *testing.T) {
 	suite.Run(t, new(LocalSocketTest))
 }
 
-// TestLocalSocketNormal confirm the operation when localSocket is used normally.
-func (suite *LocalSocketTest) TestLocalSocketNormal() {
+// TestNormal confirm the operation when localSocket is used normally.
+func (suite *LocalSocketTest) TestNormal() {
 
 	streamID := int32(1)
 	serviceID := "serviceID"
@@ -98,8 +98,8 @@ func (suite *LocalSocketTest) TestLocalSocketNormal() {
 	suite.Require().NotNil(onReadErrorArgs.Err)
 }
 
-// TestLocalSocketWriteError confirm that Write metho returns error if writing to socket fails.
-func (suite *LocalSocketTest) TestLocalSocketWriteError() {
+// TestWriteError confirm that Write method returns error if writing to socket fails.
+func (suite *LocalSocketTest) TestWriteError() {
 
 	streamID := int32(1)
 	serviceID := "serviceID"
@@ -117,7 +117,8 @@ func (suite *LocalSocketTest) TestLocalSocketWriteError() {
 	suite.Require().NotNil(err)
 }
 
-func (suite *LocalSocketTest) TestLocalSocketOnReadDataError() {
+// TestOnReadDataError confirm that localSocket stop, if OnReadData returns error.
+func (suite *LocalSocketTest) TestOnReadDataError() {
 
 	streamID := int32(1)
 	serviceID := "serviceID"
