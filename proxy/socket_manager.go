@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	readBufSize = 32 * 1024
+	readBufSize = 32 * 1024 // socket read buffer
 )
 
 // LocalSocketManager is a structure for managing local connections.
