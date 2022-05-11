@@ -51,6 +51,7 @@ type LocalProxy struct {
 	awsClient        client.AWSClient
 	socketManager    *LocalSocketManager
 	serviceMap       map[string]ServiceConfig // [ServiceID]*ServiceConfig
+	serverMap        map[string]*tcpServer    // [ServiceID]*tcpServer
 }
 
 // NewLocalProxy returns a LocalProxy instance.
@@ -58,20 +59,32 @@ func NewLocalProxy(options LocalProxyOptions) (*LocalProxy, error) {
 
 	// map[ServiceID]
 	serviceMap := map[string]ServiceConfig{}
+	serverMap := map[string]*tcpServer{}
 
 	for _, config := range options.ServiceConfigs {
 
 		serviceMap[config.ServiceID] = config
+
+		if options.Mode == client.ModeSource {
+			server, err := newTCPServer(config)
+			if err != nil {
+				return nil, err
+			}
+
+			serverMap[config.ServiceID] = server
+		}
 	}
 
 	localProxy := &LocalProxy{
 		mode:             options.Mode,
 		localDialTimeout: options.LocalDialTimeout,
 		serviceMap:       serviceMap,
+		serverMap:        serverMap,
 	}
 
 	listener := &eventLisnter{
 		localProxy: localProxy,
+		idGen:      newStreamIDGen(),
 	}
 
 	awsClientOptions := client.AWSClientOptions{
@@ -129,6 +142,7 @@ func (proxy *LocalProxy) Run(ctx context.Context) error {
 // and a few other interfaces.
 type eventLisnter struct {
 	localProxy *LocalProxy
+	idGen      *streamIDGen
 }
 
 // --------------------------------------------
@@ -183,19 +197,85 @@ func (listener *eventLisnter) OnSessionReset(message *client.Message) {
 	listener.localProxy.socketManager.StopAll()
 }
 
-// OnReceivedData Refer to AWSMeesageListener.OnReceivedData
-func (listener *eventLisnter) OnReceivedData(message *client.Message) error {
+// OnData Refer to AWSMeesageListener.OnData
+func (listener *eventLisnter) OnData(message *client.Message) error {
 
 	err := listener.localProxy.socketManager.Write(message.StreamId, message.ServiceId, message.Payload)
 	return err
 }
 
-// OnReceivedServiceIDs Refer to AWSMeesageListener.OnReceivedServiceIDs
-func (listener *eventLisnter) OnReceivedServiceIDs(message *client.Message) error {
+// OnServiceIDs Refer to AWSMeesageListener.OnServiceIDs
+func (listener *eventLisnter) OnServiceIDs(message *client.Message) error {
 
-	// In source mode, start server listening.
+	if listener.localProxy.mode == client.ModeSource {
+
+		for _, server := range listener.localProxy.serverMap {
+
+			serviceID := server.config.ServiceID
+
+			// Check if the service is available.
+			available := false
+			for _, availableServiceID := range message.AvailableServiceIds {
+				if availableServiceID == serviceID {
+					available = true
+					break
+				}
+			}
+
+			if !available {
+				log.Warnf(
+					"'%s' is not available service. You need to specify that service when you run OpenTunnel WebAPI.",
+					serviceID)
+				continue
+			}
+
+			// start accepting
+			onConnected := listener.onConnectedHandler(serviceID)
+
+			// The second and subsequent calls do nothing.
+			server.Start(onConnected)
+		}
+
+	}
 
 	return nil
+}
+
+// --------------------------------------------
+//  LocalServer handler
+// --------------------------------------------
+
+// onConnectedHandler returns the handler to be executed when connecting to the local server.
+func (listener *eventLisnter) onConnectedHandler(serviceID string) func(net.Conn) {
+
+	return func(con net.Conn) {
+
+		streamID := listener.idGen.generate()
+
+		err := listener.localProxy.awsClient.SendStreamStart(streamID, serviceID)
+		if err != nil {
+			log.Error(err)
+
+			err = con.Close()
+			if err != nil {
+				log.Error(err)
+			}
+
+			return
+		}
+
+		err = listener.localProxy.socketManager.StartSocket(streamID, serviceID, con)
+		if err != nil {
+			log.Error(err)
+
+			err = con.Close()
+			if err != nil {
+				log.Error(err)
+			}
+		}
+
+	}
+
 }
 
 // --------------------------------------------

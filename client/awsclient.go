@@ -56,16 +56,16 @@ type AWSMessageListener interface {
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#sessionreset
 	OnSessionReset(message *Message)
 
-	// OnReceivedData is an event handler that fires when a Data message is received.
+	// OnData is an event handler that fires when a Data message is received.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#data
-	OnReceivedData(message *Message) error
+	OnData(message *Message) error
 
-	// OnReceivedServiceIDs is an event handler that fires when a ServiceIDs message is received.
+	// OnServiceIDs is an event handler that fires when a ServiceIDs message is received.
 	// 	Note:
 	// 		The server will also send a ServiceIDs message when reconnecting.
 	// 		That is, this method will also be executed when reconnecting.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#serviceids
-	OnReceivedServiceIDs(message *Message) error
+	OnServiceIDs(message *Message) error
 }
 
 // AWSClient is an interface, for the purpose of connectiong secure tunneling service.
@@ -545,10 +545,10 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 
 		client.workerMng.exec(message.StreamId, func(context.Context) {
 
-			err := messageListener.OnReceivedData(message)
+			err := messageListener.OnData(message)
 			if err != nil {
 				log.Errorf(
-					"OnReceivedData event failed -> StreamID=%d ServiceID=%s: %v",
+					"OnData event failed -> StreamID=%d ServiceID=%s: %v",
 					message.StreamId,
 					message.ServiceId,
 					err)
@@ -580,9 +580,9 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 
 		log.Infof("Received ServiceIDs message ServiceID=%s", message.AvailableServiceIds)
 
-		err := messageListener.OnReceivedServiceIDs(message)
+		err := messageListener.OnServiceIDs(message)
 		if err != nil {
-			log.Errorf("OnReceivedServiceIDs() event failed: %v", err)
+			log.Errorf("OnServiceIDs() event failed: %v", err)
 		}
 
 	case Message_UNKNOWN:
