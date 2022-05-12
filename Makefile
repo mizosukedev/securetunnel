@@ -13,10 +13,41 @@ PROTO_GO_PACKAGE      := github.com/mizosukedev/securetunnel/client
 PROTO_FILE_PATH       := $(PROTO_FILE_DIR)/$(PROTO_FILE_NAME)
 MESSAGE_FILE_`OUT_DIR  := $(CURDIR)/client
 
+# Build
+GOOS       ?= $(shell go env GOOS)
+GOARCH     ?= $(shell go env GOARCH)
+BIN_DIR    := $(CURDIR)/bin
+BIN_PREFIX := $(BIN_DIR)/mitra_localproxy_
+
+# check 'go tool dist list'
+BUILD_DISTS :=  \
+  linux/amd64   \
+  linux/arm     \
+  linux/arm64   \
+  windows/amd64 \
+  windows/arm   \
+  windows/arm64 \
+
 .PHONY: \
 	install-tools \
 	update-proto  \
+	build_all     \
+	build         \
 	clean         \
+
+build_all: $(addprefix $(BIN_PREFIX), $(BUILD_DISTS))
+
+$(BIN_PREFIX)%:
+# split GOOS/GOARCH ex. linux/amd64 -> linux amd64
+	$(eval DIST_PARTS = $(subst /, ,$*))
+	@make --no-print-directory build \
+		GOOS=$(word 1, $(DIST_PARTS)) \
+		GOARCH=$(word 2, $(DIST_PARTS))
+
+build:
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+	  -o $(BIN_DIR)/mitra_localproxy_$(GOOS)_$(GOARCH)$(shell GOOS=$(GOOS) go env GOEXE) \
+	  $(CURDIR)/cmd/mitra_localproxy
 
 install-tools:
 ifndef PROTOBUF
@@ -45,3 +76,4 @@ update-proto: install-tools $(PROTO_FILE_PATH)
 
 clean:
 	rm -f $(PROTO_FILE_PATH)
+	rm -f $(BIN_PREFIX)*

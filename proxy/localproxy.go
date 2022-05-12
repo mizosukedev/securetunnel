@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -44,6 +45,41 @@ type LocalProxyOptions struct {
 	PingInterval time.Duration
 }
 
+// Validate options and returns result.
+func (options LocalProxyOptions) Validate() error {
+
+	switch options.Mode {
+	case client.ModeDestination, client.ModeSource:
+	default:
+		err := fmt.Errorf("invalid mode: %v", options.Mode)
+		return err
+	}
+
+	switch options.Endpoint.Scheme {
+	case "ws", "wss":
+	default:
+		err := errors.New("endpoint scheme should be 'ws://' or 'wss://'")
+		return err
+	}
+
+	if len(options.ServiceConfigs) == 0 {
+		err := errors.New("ServiceConfigs is empty")
+		return err
+	}
+
+	if options.Endpoint == nil {
+		err := errors.New("Endpoint is nil")
+		return err
+	}
+
+	if options.Token == "" {
+		err := errors.New("Token is empty")
+		return err
+	}
+
+	return nil
+}
+
 // LocalProxy represents localproxy in aws secure tunneling service.
 type LocalProxy struct {
 	mode             client.Mode
@@ -56,6 +92,11 @@ type LocalProxy struct {
 
 // NewLocalProxy returns a LocalProxy instance.
 func NewLocalProxy(options LocalProxyOptions) (*LocalProxy, error) {
+
+	err := options.Validate()
+	if err != nil {
+		return nil, err
+	}
 
 	// map[ServiceID]
 	serviceMap := map[string]ServiceConfig{}
