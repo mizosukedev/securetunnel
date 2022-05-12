@@ -15,7 +15,7 @@ func TestWorker(t *testing.T) {
 	suite.Run(t, new(WorkerTest))
 }
 
-// TestWorkerNormal confirm the operation when Worker is used normally.
+// TestNormal confirm the operation when Worker is used normally.
 func (suite *WorkerTest) TestNormal() {
 
 	bufSize := 10
