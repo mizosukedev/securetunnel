@@ -32,5 +32,5 @@ func (suite *StreamIDGenTest) TestNormal() {
 
 	// check counter reset.
 	counter := id / 1000000
-	suite.Require().Equal(1, counter)
+	suite.Require().Equal(int32(1), counter)
 }
