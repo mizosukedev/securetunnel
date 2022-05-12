@@ -27,7 +27,7 @@ func (suite *LocalSocketManagerTest) TestNormal() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	socketReader := testutil.NewMockSocketReader()
+	socketReader := NewMockSocketReader()
 	socketManager := NewLocalSocketManager(socketReader)
 
 	listener, err := testutil.StartTCPServer(ctx, func(con net.Conn) {
@@ -74,7 +74,7 @@ func (suite *LocalSocketManagerTest) TestNormal() {
 		_, err := fmt.Sscanf(string(actual.Data), "StreamID=%d, ServiceID=%s", &streamID, &serviceID)
 		suite.Require().Nil(err)
 
-		expected := testutil.OnReadDataArgs{
+		expected := OnReadDataArgs{
 			StreamID:  streamID,
 			ServiceID: serviceID,
 			Data:      []byte(fmt.Sprintf("StreamID=%d, ServiceID=%s", streamID, serviceID)),
@@ -99,7 +99,7 @@ func (suite *LocalSocketManagerTest) TestStartSocketStreamIDExists() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	socketReader := testutil.NewMockSocketReader()
+	socketReader := NewMockSocketReader()
 	socketManager := NewLocalSocketManager(socketReader)
 
 	listener, err := testutil.StartTCPServer(ctx, func(con net.Conn) {
@@ -122,7 +122,7 @@ func (suite *LocalSocketManagerTest) TestStartSocketStreamIDExists() {
 // TestWriteStreamIDNotFound confirm that the error occurs when the StreamID of the argument of Write() does not exist.
 func (suite *LocalSocketManagerTest) TestWriteStreamIDNotFound() {
 
-	socketReader := testutil.NewMockSocketReader()
+	socketReader := NewMockSocketReader()
 	socketManager := NewLocalSocketManager(socketReader)
 
 	err := socketManager.Write(int32(10), "serviceID", []byte{})
