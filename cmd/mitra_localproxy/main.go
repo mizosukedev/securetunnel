@@ -51,7 +51,7 @@ func main() {
 	// signal handler
 	applicationExit(func(signal os.Signal) {
 		log.Infof(
-			"receive signal. Please wait up to %d seconds to terminate.",
+			"received signal. Please wait up to %d seconds to terminate.",
 			int(terminateWaitTime.Seconds()))
 
 		cancel()
