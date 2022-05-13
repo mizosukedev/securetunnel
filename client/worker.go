@@ -7,9 +7,9 @@ import "context"
 // The function is executed sequentially by the internal goroutine.
 // This structure cannot be reused.
 type Worker struct {
-	exec      chan func(context.Context)
-	terminate chan struct{}
-	cancel    chan context.CancelFunc
+	chExec      chan func(context.Context)
+	chTerminate chan struct{}
+	chCancel    chan context.CancelFunc
 }
 
 // NewWorker returns a Worker instance.
@@ -17,9 +17,9 @@ type Worker struct {
 func NewWorker(bufSize int) *Worker {
 
 	instance := &Worker{
-		exec:      make(chan func(context.Context), bufSize),
-		terminate: make(chan struct{}, 1),
-		cancel:    make(chan context.CancelFunc, 1),
+		chExec:      make(chan func(context.Context), bufSize),
+		chTerminate: make(chan struct{}, 1),
+		chCancel:    make(chan context.CancelFunc, 1),
 	}
 
 	return instance
@@ -29,16 +29,16 @@ func NewWorker(bufSize int) *Worker {
 func (worker *Worker) Start(ctx context.Context) {
 
 	ctx, cancel := context.WithCancel(ctx)
-	worker.cancel <- cancel
+	worker.chCancel <- cancel
 
 	go func() {
-		defer close(worker.terminate)
+		defer close(worker.chTerminate)
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case fnc := <-worker.exec:
+			case fnc := <-worker.chExec:
 				fnc(ctx)
 			}
 		}
@@ -51,22 +51,22 @@ func (worker *Worker) Start(ctx context.Context) {
 // 	- Stop() method.
 func (worker *Worker) Run(ctx context.Context) {
 	worker.Start(ctx)
-	<-worker.terminate
+	<-worker.chTerminate
 }
 
 // Exec is a function for writing functions to be executed sequentially.
 func (worker *Worker) Exec(fnc func(context.Context)) {
-	worker.exec <- fnc
+	worker.chExec <- fnc
 }
 
 // Stop inner goroutine.
 func (worker *Worker) Stop() {
 
-	cancel, ok := <-worker.cancel
+	cancel, ok := <-worker.chCancel
 
 	if ok {
-		close(worker.cancel)
+		close(worker.chCancel)
 		cancel()
-		<-worker.terminate
+		<-worker.chTerminate
 	}
 }

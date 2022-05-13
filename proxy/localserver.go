@@ -15,7 +15,7 @@ type tcpServer struct {
 	config   ServiceConfig
 	listener net.Listener
 	acceptWG *sync.WaitGroup
-	chanStop chan struct{}
+	chStop   chan struct{}
 	mutex    *sync.Mutex
 	started  bool
 }
@@ -57,7 +57,7 @@ func newTCPServer(config ServiceConfig) (*tcpServer, error) {
 		config:   config,
 		listener: listener,
 		acceptWG: &sync.WaitGroup{},
-		chanStop: make(chan struct{}, 1),
+		chStop:   make(chan struct{}, 1),
 		mutex:    &sync.Mutex{},
 		started:  false,
 	}
@@ -101,7 +101,7 @@ func (server *tcpServer) Start(handler func(net.Conn)) {
 		for {
 
 			select {
-			case <-server.chanStop:
+			case <-server.chStop:
 				return
 
 			default:
@@ -138,7 +138,7 @@ func (server *tcpServer) Start(handler func(net.Conn)) {
 // Stop accepting.
 func (server *tcpServer) Stop() {
 
-	close(server.chanStop)
+	close(server.chStop)
 
 	err := server.listener.Close()
 	if err != nil {

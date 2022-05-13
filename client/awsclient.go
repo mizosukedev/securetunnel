@@ -254,18 +254,18 @@ func (client *awsClient) start(ctx context.Context) error {
 	defer cancel()
 
 	// start thread for sending ping.
-	chanSendPingTerminate := make(chan struct{}, 1)
+	chSendPingTerminate := make(chan struct{}, 1)
 	go func() {
 		client.keepSendingPing(innerCtx)
-		close(chanSendPingTerminate)
+		close(chSendPingTerminate)
 	}()
 
 	// start thread for reading messages.
-	chanReadMessageResult := make(chan error, 1)
+	chReadMessageResult := make(chan error, 1)
 	go func() {
 		// When this thread terminates, it terminates the sending ping thread.
 		defer cancel()
-		chanReadMessageResult <- client.keepReadingMessages(innerCtx)
+		chReadMessageResult <- client.keepReadingMessages(innerCtx)
 	}()
 
 	select {
@@ -279,10 +279,10 @@ func (client *awsClient) start(ctx context.Context) error {
 		}
 
 		// wait for reading thread to terminate.
-		<-chanReadMessageResult
+		<-chReadMessageResult
 		err = ctx.Err()
 	// reading messages error.
-	case err = <-chanReadMessageResult:
+	case err = <-chReadMessageResult:
 		closeErr := client.close(websocket.CloseNormalClosure, "normal closure")
 		if closeErr != nil {
 			log.Error(closeErr)
@@ -290,7 +290,7 @@ func (client *awsClient) start(ctx context.Context) error {
 	}
 
 	// wait for sending ping thread to terminate.
-	<-chanSendPingTerminate
+	<-chSendPingTerminate
 
 	// stop all Worker
 	client.workerMng.stopAll()

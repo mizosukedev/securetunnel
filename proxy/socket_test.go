@@ -33,8 +33,8 @@ func (suite *LocalSocketTest) TestNormal() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	chanServerDone := make(chan struct{})
-	chanClientDone := make(chan struct{})
+	chServerDone := make(chan struct{})
+	chClientDone := make(chan struct{})
 
 	listener, err := testutil.StartTCPServer(ctx, func(con net.Conn) {
 
@@ -47,7 +47,7 @@ func (suite *LocalSocketTest) TestNormal() {
 		suite.Require().Nil(err)
 
 		// check client message
-		actual := <-socketReader.ChanOnReadDataArgs
+		actual := <-socketReader.ChOnReadDataArgs
 		expected := testutil.OnReadDataArgs{
 			StreamID:  streamID,
 			ServiceID: serviceID,
@@ -56,8 +56,8 @@ func (suite *LocalSocketTest) TestNormal() {
 
 		suite.Require().Equal(expected, actual)
 
-		close(chanServerDone)
-		<-chanClientDone
+		close(chServerDone)
+		<-chClientDone
 		socket.Stop()
 	})
 	defer listener.Close()
@@ -75,7 +75,7 @@ func (suite *LocalSocketTest) TestNormal() {
 	suite.Require().Nil(err)
 
 	// check server message
-	actual := <-socketReader.ChanOnReadDataArgs
+	actual := <-socketReader.ChOnReadDataArgs
 	expected := testutil.OnReadDataArgs{
 		StreamID:  streamID,
 		ServiceID: serviceID,
@@ -84,15 +84,15 @@ func (suite *LocalSocketTest) TestNormal() {
 
 	suite.Require().Equal(expected, actual)
 
-	close(chanClientDone)
-	<-chanServerDone
+	close(chClientDone)
+	<-chServerDone
 
 	// Confirm no panic occurs even if Stop() is executed multiple times.
 	socket.Stop()
 	socket.Stop()
 
 	// socket.Stop() -> con.Read() returns error -> OnReadError is triggered
-	onReadErrorArgs := <-socketReader.ChanOnReadError
+	onReadErrorArgs := <-socketReader.ChOnReadError
 	suite.Require().Equal(streamID, onReadErrorArgs.StreamID)
 	suite.Require().Equal(serviceID, onReadErrorArgs.ServiceID)
 	suite.Require().NotNil(onReadErrorArgs.Err)
@@ -154,7 +154,7 @@ func (suite *LocalSocketTest) TestOnReadDataError() {
 	socket.Start()
 
 	// confirm that goroutine terminates
-	<-socket.chanTerminate
+	<-socket.chTerminate
 
 	socket.Stop()
 }

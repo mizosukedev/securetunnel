@@ -6,9 +6,9 @@ import (
 )
 
 type MockConn struct {
-	ReadArgs       chan []byte
+	ChReadArgs     chan []byte
 	MockRead       func(b []byte) (n int, err error)
-	WriteArgs      chan []byte
+	ChWriteArgs    chan []byte
 	MockWrite      func(b []byte) (n int, err error)
 	MockClose      func() error
 	MockLocalAddr  func() net.Addr
@@ -18,11 +18,11 @@ type MockConn struct {
 func NewMockConn() *MockConn {
 
 	mock := &MockConn{
-		ReadArgs: make(chan []byte, 10),
+		ChReadArgs: make(chan []byte, 10),
 		MockRead: func(b []byte) (n int, err error) {
 			return 0, nil
 		},
-		WriteArgs: make(chan []byte, 10),
+		ChWriteArgs: make(chan []byte, 10),
 		MockWrite: func(b []byte) (n int, err error) {
 			return 0, nil
 		},
@@ -41,12 +41,12 @@ func NewMockConn() *MockConn {
 }
 
 func (mock *MockConn) Read(b []byte) (n int, err error) {
-	mock.ReadArgs <- b
+	mock.ChReadArgs <- b
 	return mock.MockRead(b)
 }
 
 func (mock *MockConn) Write(b []byte) (n int, err error) {
-	mock.WriteArgs <- b
+	mock.ChWriteArgs <- b
 	return mock.MockWrite(b)
 }
 

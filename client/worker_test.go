@@ -24,19 +24,19 @@ func (suite *WorkerTest) TestNormal() {
 	worker := NewWorker(bufSize)
 	worker.Start(context.Background())
 
-	suite.Require().Equal(bufSize, cap(worker.exec))
+	suite.Require().Equal(bufSize, cap(worker.chExec))
 
-	buf := make(chan int, functionCount)
+	chBuf := make(chan int, functionCount)
 
 	for i := 0; i < functionCount; i++ {
 		data := i
 		worker.Exec(func(ctx context.Context) {
-			buf <- data
+			chBuf <- data
 		})
 	}
 
 	for i := 0; i < functionCount; i++ {
-		actual := <-buf
+		actual := <-chBuf
 		expected := i
 
 		suite.Require().Equal(expected, actual)
@@ -55,14 +55,14 @@ func (suite *WorkerTest) TestContextCancel() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go worker.Run(ctx)
 
-	called := make(chan struct{})
+	chCalled := make(chan struct{})
 	worker.Exec(func(ctx context.Context) {
-		called <- struct{}{}
+		chCalled <- struct{}{}
 		<-ctx.Done()
 	})
 
-	<-called
+	<-chCalled
 	cancel()
-	<-worker.terminate
+	<-worker.chTerminate
 	worker.Stop()
 }
