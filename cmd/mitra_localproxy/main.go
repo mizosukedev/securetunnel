@@ -66,9 +66,9 @@ func main() {
 	})
 
 	// Run LocalProxy
-	chanTerminate := make(chan struct{})
+	chTerminate := make(chan struct{})
 	go func() {
-		defer close(chanTerminate)
+		defer close(chTerminate)
 
 		localProxy, err := proxy.NewLocalProxy(options)
 		if err != nil {
@@ -86,7 +86,7 @@ func main() {
 	// Wait for LocalProxy.Run() to terimnate.
 	select {
 	// terminated gracefully.
-	case <-chanTerminate:
+	case <-chTerminate:
 		log.Info("mitra_localproxy stopped")
 	// Since LocalProxy did not terminate normally, so kill it.
 	case <-time.After(localProxyMaxLifeTime):

@@ -20,12 +20,12 @@ type SocketReader interface {
 // Each time the data is read, the method of the SocketReader interface is triggered.
 // This structure manages only one connection.
 type localSocket struct {
-	streamID      int32
-	serviceID     string
-	con           net.Conn
-	socketReader  SocketReader
-	readBufSize   int
-	chanTerminate chan struct{}
+	streamID     int32
+	serviceID    string
+	con          net.Conn
+	socketReader SocketReader
+	readBufSize  int
+	chTerminate  chan struct{}
 }
 
 // newLocalSocket returns a localSocket instance.
@@ -51,11 +51,11 @@ func newLocalSocket(
 // via inner SocketReader in the background.
 func (socket *localSocket) Start() {
 
-	socket.chanTerminate = make(chan struct{})
+	socket.chTerminate = make(chan struct{})
 
 	// Start thread for sucking data.
 	go func() {
-		defer close(socket.chanTerminate)
+		defer close(socket.chTerminate)
 
 		err := socket.suck()
 		if err != nil {
@@ -143,5 +143,5 @@ func (socket *localSocket) Stop() {
 		log.Error(err)
 	}
 
-	<-socket.chanTerminate
+	<-socket.chTerminate
 }

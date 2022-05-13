@@ -67,7 +67,7 @@ func (suite *LocalSocketManagerTest) TestNormal() {
 	// check server message
 	for i := 0; i < connectCount; i++ {
 
-		actual := <-socketReader.ChanOnReadDataArgs
+		actual := <-socketReader.ChOnReadDataArgs
 
 		streamID := int32(0)
 		serviceID := ""

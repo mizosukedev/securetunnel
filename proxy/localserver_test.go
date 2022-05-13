@@ -57,7 +57,7 @@ func (suite *TCPServerTest) TestNormal() {
 		suite.Require().False(server.started)
 
 		clientMessage := "test message"
-		chanMessage := make(chan string)
+		chMessage := make(chan string)
 
 		server.Start(func(c net.Conn) {
 			buf := make([]byte, len(clientMessage))
@@ -65,7 +65,7 @@ func (suite *TCPServerTest) TestNormal() {
 			_, readErr := c.Read(buf)
 			suite.Require().Nil(readErr)
 
-			chanMessage <- string(buf)
+			chMessage <- string(buf)
 		})
 		defer server.Stop()
 
@@ -78,7 +78,7 @@ func (suite *TCPServerTest) TestNormal() {
 		_, err = con.Write([]byte(clientMessage))
 		suite.Require().Nil(err)
 
-		receivedMessage := <-chanMessage
+		receivedMessage := <-chMessage
 
 		suite.Require().Equal(clientMessage, receivedMessage)
 	}

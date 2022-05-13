@@ -59,7 +59,7 @@ func setupLogger(logLevel string) error {
 		log.Infof = logger.Sugar().Infof
 	}
 
-	if priority <= logPriorityInfo {
+	if priority <= logPriorityWarn {
 		log.Warn = logger.Sugar().Warn
 		log.Warnf = logger.Sugar().Warnf
 	}
