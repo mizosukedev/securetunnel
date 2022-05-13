@@ -546,7 +546,7 @@ func (client *awsClient) invokeEvent(
 
 		log.Debugf("received Data message StreamID=%d ServiceID=%s", message.StreamId, message.ServiceId)
 
-		client.workerMng.exec(message.StreamId, func(context.Context) {
+		executed := client.workerMng.exec(message.StreamId, func(context.Context) {
 
 			err := messageListener.OnData(message)
 			if err != nil {
@@ -563,6 +563,10 @@ func (client *awsClient) invokeEvent(
 			}
 		})
 
+		if !executed {
+			log.Warnf("the StreamID has already been reset. StreamID=%d", message.StreamId)
+		}
+
 	case protomsg.Message_STREAM_RESET:
 
 		log.Warnf(
@@ -570,12 +574,17 @@ func (client *awsClient) invokeEvent(
 			message.StreamId,
 			message.ServiceId)
 
-		client.workerMng.exec(message.StreamId, func(context.Context) {
+		executed := client.workerMng.exec(message.StreamId, func(context.Context) {
 			messageListener.OnStreamReset(message)
 			client.workerMng.stop(message.StreamId)
 		})
 
+		if !executed {
+			log.Warnf("the StreamID has already been reset. StreamID=%d", message.StreamId)
+		}
+
 	case protomsg.Message_SESSION_RESET:
+
 		log.Warn("Received SessionReset message")
 		messageListener.OnSessionReset(message)
 
