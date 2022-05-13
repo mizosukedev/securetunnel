@@ -394,6 +394,11 @@ func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 			}
 
 			for _, message := range messages {
+				// Perhaps Ignorable message can handle localproxy-specific data...?
+				if message.Ignorable {
+					continue
+				}
+
 				for _, handler := range client.messageListeners {
 					client.invokeEvent(handler, message)
 				}
