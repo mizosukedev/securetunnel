@@ -11,7 +11,7 @@ PROTO_FILE_DIR        := $(CURDIR)/proto
 PROTO_FILE_NAME       := Message.proto
 PROTO_GO_PACKAGE      := github.com/mizosukedev/securetunnel/client
 PROTO_FILE_PATH       := $(PROTO_FILE_DIR)/$(PROTO_FILE_NAME)
-MESSAGE_FILE_`OUT_DIR  := $(CURDIR)/client
+MESSAGE_FILE_OUT_DIR  := $(CURDIR)/client
 
 # Build
 GOOS       ?= $(shell go env GOOS)
@@ -71,7 +71,7 @@ update-proto: install-tools $(PROTO_FILE_PATH)
 		-I "$(PROTO_FILE_DIR)"                             \
 		--go_opt=paths=source_relative                     \
 		--go_opt=M"$(PROTO_FILE_NAME)"=$(PROTO_GO_PACKAGE) \
-		--go_out="$(MESSAGE_FILE_`OUT_DIR)"                 \
+		--go_out="$(MESSAGE_FILE_OUT_DIR)"                 \
 		"$(PROTO_FILE_NAME)"
 
 clean:
