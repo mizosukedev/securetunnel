@@ -150,3 +150,19 @@ func (suite *TCPServerTest) TestStopCloseError() {
 	server.Stop()
 	server.acceptWG.Wait()
 }
+
+// TestStartDuplicate confirm that nothing happens after the second time,
+// if the start method is executed twice.
+func (suite *TCPServerTest) TestStartExecuteTwice() {
+
+	config := ServiceConfig{"ssh", "tcp", freeAddress}
+	server, err := newTCPServer(config)
+	suite.Require().Nil(err)
+
+	suite.Require().False(server.started)
+	server.Start(func(c net.Conn) {})
+	suite.Require().True(server.started)
+	server.Start(func(c net.Conn) {})
+
+	server.Stop()
+}
