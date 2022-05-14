@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"testing"
 	"time"
 
@@ -172,6 +173,145 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	<-messageListener.ChSessionResetArg
 	receivedServiceIDsMessage := <-messageListener.ChServiceIDsArg
 	suite.Require().Equal(receivedServiceIDsMessage.AvailableServiceIds, serviceIDsMessage.AvailableServiceIds)
+}
+
+// TestReceivedMessageListenerReturnsError confirm the behavior
+// when AWSMessageListener's event handlers returns error.
+func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
+
+	server := testutil.NewSecureTunnelServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server.Start(ctx)
+
+	chConnected := make(chan struct{}, 1)
+
+	messageListener := NewMockAWSMessageListener()
+
+	options := defaultOptions()
+	options.Endpoint = server.Endpoint
+	options.MessageListeners = []AWSMessageListener{messageListener}
+	options.ConnectHandlers = []func(){
+		func() {
+			chConnected <- struct{}{}
+		},
+	}
+
+	client, err := NewAWSClient(options)
+	suite.Require().Nil(err)
+
+	go client.Run(ctx)
+
+	// wait for connection
+	<-chConnected
+
+	ws := <-server.ChWebSocket
+	request := <-server.ChRequest
+
+	// check request header
+	suite.Require().Equal(string(ModeDestination), request.FormValue(queryKeyProxyMode))
+	suite.Require().Equal([]string{options.Token}, request.Header["Access-Token"])
+	suite.Require().Equal(subProtocols, request.Header["Sec-Websocket-Protocol"])
+
+	// -----------------------------
+	//  StreamStart message
+	messageListener.MockOnStreamStart = func(message *protomsg.Message) error {
+		return errors.New("test error")
+	}
+
+	streamStartMessage := &protomsg.Message{
+		StreamId:  1,
+		ServiceId: "serviceID1",
+		Type:      protomsg.Message_STREAM_START,
+		Ignorable: false,
+	}
+	messagesBin, err := marshalMessage([]*protomsg.Message{streamStartMessage})
+	suite.Require().Nil(err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
+	suite.Require().Nil(err)
+
+	<-messageListener.ChStreamStartArg
+
+	readMessageResult := <-server.ChMessage
+	streamResetMessage := &protomsg.Message{}
+	err = proto.Unmarshal(readMessageResult.Message[sizeOfMessageSize:], streamResetMessage)
+	suite.Require().Nil(err)
+	suite.Require().Equal(protomsg.Message_STREAM_RESET, streamResetMessage.Type)
+	suite.Require().Equal(streamStartMessage.StreamId, streamResetMessage.StreamId)
+
+	messageListener.MockOnStreamStart = func(message *protomsg.Message) error {
+		return nil
+	}
+
+	// -----------------------------
+	//  Data message
+	messageListener.MockOnData = func(message *protomsg.Message) error {
+		return errors.New("test error")
+	}
+
+	dataMessage := &protomsg.Message{
+		StreamId:  1,
+		ServiceId: "serviceID1",
+		Type:      protomsg.Message_DATA,
+		Payload:   []byte{},
+		Ignorable: false,
+	}
+
+	messagesBin, err = marshalMessage([]*protomsg.Message{streamStartMessage, dataMessage})
+	suite.Require().Nil(err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
+	suite.Require().Nil(err)
+
+	readMessageResult = <-server.ChMessage
+	dataMessage = &protomsg.Message{}
+	err = proto.Unmarshal(readMessageResult.Message[sizeOfMessageSize:], dataMessage)
+	suite.Require().Nil(err)
+	suite.Require().Equal(protomsg.Message_STREAM_RESET, dataMessage.Type)
+	suite.Require().Equal(streamStartMessage.StreamId, dataMessage.StreamId)
+
+	// confirm that Worker was stopped
+	stopped := false
+	for i := 0; i < 10; i++ {
+
+		workers := client.(*awsClient).workerMng.getAll()
+		if len(workers) == 0 {
+			stopped = true
+			break
+		}
+
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	suite.Require().True(stopped)
+
+	messageListener.MockOnData = func(message *protomsg.Message) error {
+		return nil
+	}
+
+	// -----------------------------
+	//  ServiceIDs message
+	messageListener.MockServiceIDs = func(message *protomsg.Message) error {
+		return errors.New("test error")
+	}
+
+	serviceIDsMessage := &protomsg.Message{
+		Type:                protomsg.Message_DATA,
+		AvailableServiceIds: []string{},
+		Ignorable:           false,
+	}
+
+	messagesBin, err = marshalMessage([]*protomsg.Message{serviceIDsMessage})
+	suite.Require().Nil(err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
+	suite.Require().Nil(err)
+
+	messageListener.MockServiceIDs = func(message *protomsg.Message) error {
+		return nil
+	}
 }
 
 // sendMessage
