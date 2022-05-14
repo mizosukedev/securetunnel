@@ -29,11 +29,11 @@ BUILD_DISTS :=  \
   windows/arm64 \
 
 .PHONY: \
-	install-tools \
-	update-proto  \
-	build_all     \
-	build         \
-	clean         \
+  install-tools \
+  update-proto  \
+  build_all     \
+  build         \
+  clean         \
 
 build_all: $(addprefix $(BIN_PREFIX), $(BUILD_DISTS))
 
