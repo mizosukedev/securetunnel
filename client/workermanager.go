@@ -2,9 +2,7 @@ package client
 
 import (
 	"context"
-	sync "sync"
-
-	"github.com/mizosukedev/securetunnel/log"
+	"sync"
 )
 
 // workerManager is a structure for managing Worker for each StreamID.
@@ -27,8 +25,9 @@ func (mng *workerManager) start(streamID int32) *Worker {
 	return worker
 }
 
-// exec Worker
-func (mng *workerManager) exec(streamID int32, fnc func(context.Context)) {
+// exec Worker.
+// Returns true if the corresponding StreamID exists, false otherwise.
+func (mng *workerManager) exec(streamID int32, fnc func(context.Context)) bool {
 
 	mng.rwMutex.RLock()
 	defer mng.rwMutex.RUnlock()
@@ -36,9 +35,10 @@ func (mng *workerManager) exec(streamID int32, fnc func(context.Context)) {
 	worker, ok := mng.workerMap[streamID]
 	if ok {
 		worker.Exec(fnc)
-	} else {
-		log.Warnf("the StreamID has already been reset. StreamID=%d", streamID)
+		return true
 	}
+
+	return false
 }
 
 // stop Worker asynchronously.

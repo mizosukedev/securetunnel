@@ -38,7 +38,7 @@ func (suite *LocalSocketTest) TestNormal() {
 
 	listener, err := testutil.StartTCPServer(ctx, func(con net.Conn) {
 
-		socketReader := testutil.NewMockSocketReader()
+		socketReader := NewMockSocketReader()
 		socket := newLocalSocket(streamID, serviceID, con, socketReader, bufSize)
 		socket.Start()
 
@@ -48,7 +48,7 @@ func (suite *LocalSocketTest) TestNormal() {
 
 		// check client message
 		actual := <-socketReader.ChOnReadDataArgs
-		expected := testutil.OnReadDataArgs{
+		expected := OnReadDataArgs{
 			StreamID:  streamID,
 			ServiceID: serviceID,
 			Data:      []byte(messageFromClient),
@@ -66,7 +66,7 @@ func (suite *LocalSocketTest) TestNormal() {
 
 	con, err := testutil.ConnectTCPServer(listener.Addr().String())
 
-	socketReader := testutil.NewMockSocketReader()
+	socketReader := NewMockSocketReader()
 	socket := newLocalSocket(streamID, serviceID, con, socketReader, bufSize)
 	socket.Start()
 
@@ -76,7 +76,7 @@ func (suite *LocalSocketTest) TestNormal() {
 
 	// check server message
 	actual := <-socketReader.ChOnReadDataArgs
-	expected := testutil.OnReadDataArgs{
+	expected := OnReadDataArgs{
 		StreamID:  streamID,
 		ServiceID: serviceID,
 		Data:      []byte(messageFromServer),
@@ -109,7 +109,7 @@ func (suite *LocalSocketTest) TestWriteError() {
 		return -1, errors.New("test error")
 	}
 
-	mockSocketReader := testutil.NewMockSocketReader()
+	mockSocketReader := NewMockSocketReader()
 
 	socket := newLocalSocket(streamID, serviceID, mockConn, mockSocketReader, bufSize)
 
@@ -129,7 +129,7 @@ func (suite *LocalSocketTest) TestOnReadDataError() {
 
 	listener, err := testutil.StartTCPServer(ctx, func(con net.Conn) {
 
-		socketReader := testutil.NewMockSocketReader()
+		socketReader := NewMockSocketReader()
 		socket := newLocalSocket(streamID, serviceID, con, socketReader, bufSize)
 		socket.Start()
 
@@ -145,7 +145,7 @@ func (suite *LocalSocketTest) TestOnReadDataError() {
 
 	con, err := testutil.ConnectTCPServer(listener.Addr().String())
 
-	socketReader := testutil.NewMockSocketReader()
+	socketReader := NewMockSocketReader()
 	// OnReadData returns error
 	socketReader.MockOnReadData = func(streamID int32, serviceID string, data []byte) error {
 		return errors.New("test error")

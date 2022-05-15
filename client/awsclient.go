@@ -181,19 +181,20 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 
 // awsClient is a structure that implements AWSClient interface.
 type awsClient struct {
-	mode              Mode
-	endpoint          *url.URL
-	token             string
-	dialTimeout       time.Duration
-	reconnectInterval time.Duration
-	pingInterval      time.Duration
-	messageListeners  []AWSMessageListener
-	connectHandlers   []func()
-	dialer            *websocket.Dialer
-	requestHeader     http.Header
-	con               *websocket.Conn
-	writeMutex        *sync.Mutex // for websocket.WriteMessage()
-	workerMng         *workerManager
+	mode                  Mode
+	endpoint              *url.URL
+	token                 string
+	dialTimeout           time.Duration
+	reconnectInterval     time.Duration
+	pingInterval          time.Duration
+	messageListeners      []AWSMessageListener
+	connectHandlers       []func()
+	dialer                *websocket.Dialer
+	requestHeader         http.Header
+	con                   *websocket.Conn
+	writeMutex            *sync.Mutex             // for websocket.WriteMessage()
+	workerMng             *workerManager          //
+	unknownMessageHandler func(*protomsg.Message) // for unit testing
 }
 
 // Run Refer to AWSClient.
@@ -394,6 +395,11 @@ func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 			}
 
 			for _, message := range messages {
+				// Perhaps Ignorable message can handle localproxy-specific data...?
+				if message.Ignorable {
+					continue
+				}
+
 				for _, handler := range client.messageListeners {
 					client.invokeEvent(handler, message)
 				}
@@ -546,7 +552,7 @@ func (client *awsClient) invokeEvent(
 
 		log.Debugf("received Data message StreamID=%d ServiceID=%s", message.StreamId, message.ServiceId)
 
-		client.workerMng.exec(message.StreamId, func(context.Context) {
+		executed := client.workerMng.exec(message.StreamId, func(context.Context) {
 
 			err := messageListener.OnData(message)
 			if err != nil {
@@ -563,6 +569,10 @@ func (client *awsClient) invokeEvent(
 			}
 		})
 
+		if !executed {
+			log.Warnf("the StreamID has already been reset. StreamID=%d", message.StreamId)
+		}
+
 	case protomsg.Message_STREAM_RESET:
 
 		log.Warnf(
@@ -570,12 +580,17 @@ func (client *awsClient) invokeEvent(
 			message.StreamId,
 			message.ServiceId)
 
-		client.workerMng.exec(message.StreamId, func(context.Context) {
+		executed := client.workerMng.exec(message.StreamId, func(context.Context) {
 			messageListener.OnStreamReset(message)
 			client.workerMng.stop(message.StreamId)
 		})
 
+		if !executed {
+			log.Warnf("the StreamID has already been reset. StreamID=%d", message.StreamId)
+		}
+
 	case protomsg.Message_SESSION_RESET:
+
 		log.Warn("Received SessionReset message")
 		messageListener.OnSessionReset(message)
 
@@ -596,6 +611,11 @@ func (client *awsClient) invokeEvent(
 			message.StreamId,
 			message.Type,
 			message.Payload)
+
+		// for unit testing
+		if client.unknownMessageHandler != nil {
+			client.unknownMessageHandler(message)
+		}
 	}
 
 }
@@ -726,7 +746,7 @@ func (conErr *connectError) Error() string {
 	}
 
 	message := fmt.Sprintf(
-		"failed to connect. url=%v header=%v cause=%v",
+		"failed to connect to ->%v header=%v cause=%v",
 		conErr.url,
 		responseHeader,
 		conErr.causeErr)
@@ -760,7 +780,5 @@ func (conErr *connectError) retryable() bool {
 		}
 	}
 
-	retryable := conErr.tunnelClosed()
-
-	return retryable
+	return true
 }

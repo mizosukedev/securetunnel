@@ -1,4 +1,4 @@
-package testutil
+package proxy
 
 type OnReadDataArgs struct {
 	StreamID  int32
@@ -42,6 +42,7 @@ func (mock *MockSocketReader) OnReadData(streamID int32, serviceID string, data 
 }
 
 func (mock *MockSocketReader) OnReadError(streamID int32, serviceID string, err error) {
+
 	mock.ChOnReadError <- OnReadErrorArgs{streamID, serviceID, err}
 
 	mock.MockOnReadError(streamID, serviceID, err)
