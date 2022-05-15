@@ -774,7 +774,5 @@ func (conErr *connectError) retryable() bool {
 		}
 	}
 
-	retryable := conErr.tunnelClosed()
-
-	return retryable
+	return true
 }
