@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -129,6 +130,7 @@ func (suite *AWSClientTest) TestReconnect() {
 
 			if test.wantRunErr {
 				suite.Require().NotNil(err)
+				fmt.Println(err)
 			} else {
 				suite.Require().Nil(err)
 			}
@@ -191,9 +193,8 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 		StreamId:  1,
 		ServiceId: "serviceID1",
 		Type:      protomsg.Message_STREAM_START,
-		Ignorable: false,
 	}
-	messagesBin, err := marshalMessage([]*protomsg.Message{streamStartMessage})
+	messagesBin, err := marshalMessages([]*protomsg.Message{streamStartMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -213,7 +214,7 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 		Payload:   []byte("01234567890123456789012345678901234567890123456789"),
 	}
 
-	messagesBin, err = marshalMessage([]*protomsg.Message{dataMessage})
+	messagesBin, err = marshalMessages([]*protomsg.Message{dataMessage})
 	suite.Require().Nil(err)
 
 	// divide message
@@ -237,9 +238,8 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 		StreamId:  1,
 		ServiceId: "serviceID2",
 		Type:      protomsg.Message_STREAM_RESET,
-		Ignorable: false,
 	}
-	messagesBin, err = marshalMessage([]*protomsg.Message{streamResetMessage})
+	messagesBin, err = marshalMessages([]*protomsg.Message{streamResetMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -269,14 +269,12 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	//  receive SessionReset message
 	//  receive ServiceIDs message
 	sessionResetMessage := &protomsg.Message{
-		Type:      protomsg.Message_SESSION_RESET,
-		Ignorable: false,
+		Type: protomsg.Message_SESSION_RESET,
 	}
 
 	serviceIDsMessage := &protomsg.Message{
 		AvailableServiceIds: []string{"service1", "service2"},
 		Type:                protomsg.Message_SERVICE_IDS,
-		Ignorable:           false,
 	}
 
 	messages := []*protomsg.Message{
@@ -284,7 +282,7 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 		serviceIDsMessage,
 	}
 
-	messagesBin, err = marshalMessage(messages)
+	messagesBin, err = marshalMessages(messages)
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -346,7 +344,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 		ServiceId: "serviceID1",
 		Type:      protomsg.Message_STREAM_START,
 	}
-	messagesBin, err := marshalMessage([]*protomsg.Message{streamStartMessage})
+	messagesBin, err := marshalMessages([]*protomsg.Message{streamStartMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -356,8 +354,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 
 	// confirm that AWSClient send StreamReset message.
 	readMessageResult := <-server.ChMessage
-	streamResetMessage := &protomsg.Message{}
-	err = proto.Unmarshal(readMessageResult.Message[sizeOfMessageSize:], streamResetMessage)
+	streamResetMessage, err := readMessageResult.UnmarshalMessage()
 	suite.Require().Nil(err)
 	suite.Require().Equal(protomsg.Message_STREAM_RESET, streamResetMessage.Type)
 	suite.Require().Equal(streamStartMessage.StreamId, streamResetMessage.StreamId)
@@ -379,7 +376,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 		Payload:   []byte{},
 	}
 
-	messagesBin, err = marshalMessage([]*protomsg.Message{streamStartMessage, dataMessage})
+	messagesBin, err = marshalMessages([]*protomsg.Message{streamStartMessage, dataMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -387,8 +384,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 
 	// confirm that AWSClient send StreamReset message.
 	readMessageResult = <-server.ChMessage
-	dataMessage = &protomsg.Message{}
-	err = proto.Unmarshal(readMessageResult.Message[sizeOfMessageSize:], dataMessage)
+	dataMessage, err = readMessageResult.UnmarshalMessage()
 	suite.Require().Nil(err)
 	suite.Require().Equal(protomsg.Message_STREAM_RESET, dataMessage.Type)
 	suite.Require().Equal(streamStartMessage.StreamId, dataMessage.StreamId)
@@ -423,7 +419,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 		AvailableServiceIds: []string{},
 	}
 
-	messagesBin, err = marshalMessage([]*protomsg.Message{serviceIDsMessage})
+	messagesBin, err = marshalMessages([]*protomsg.Message{serviceIDsMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -471,7 +467,7 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 	sessionResetMessage := &protomsg.Message{
 		Type: protomsg.Message_SESSION_RESET,
 	}
-	messagesBin, err := marshalMessage([]*protomsg.Message{sessionResetMessage})
+	messagesBin, err := marshalMessages([]*protomsg.Message{sessionResetMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.TextMessage, messagesBin)
@@ -493,7 +489,7 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 		Payload: []byte("a"),
 	}
 
-	messagesBin, err = marshalMessage([]*protomsg.Message{unknownMessage})
+	messagesBin, err = marshalMessages([]*protomsg.Message{unknownMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -512,7 +508,7 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 		Ignorable: true,
 	}
 
-	messagesBin, err = marshalMessage([]*protomsg.Message{ignorableMessage, sessionResetMessage})
+	messagesBin, err = marshalMessages([]*protomsg.Message{ignorableMessage, sessionResetMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -524,11 +520,78 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 
 }
 
-// sendMessage
-// reconnect
-// tunnel closed
-// ReadMessage error
-// context.cancel
+func (suite *AWSClientTest) TestSendMessage() {
+
+	server := testutil.NewSecureTunnelServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server.Start(ctx)
+
+	chConnected := make(chan struct{}, 1)
+
+	messageListener := NewMockAWSMessageListener()
+
+	options := defaultOptions()
+	options.Endpoint = server.Endpoint
+	options.MessageListeners = []AWSMessageListener{messageListener}
+	options.ConnectHandlers = []func(){
+		func() {
+			chConnected <- struct{}{}
+		},
+	}
+
+	client, err := NewAWSClient(options)
+	suite.Require().Nil(err)
+
+	go func() {
+		client.Run(ctx)
+	}()
+
+	// wait for connection
+	<-chConnected
+
+	streamID := int32(1)
+	serviceID := "service 1"
+	data := []byte("test test test")
+
+	// ---------------------------
+	//  semd StreamStart
+	err = client.SendStreamStart(streamID, serviceID)
+	suite.Require().Nil(err)
+
+	readMessageResult := <-server.ChMessage
+	message, err := readMessageResult.UnmarshalMessage()
+	suite.Require().Nil(err)
+
+	suite.Require().Equal(streamID, message.StreamId)
+	suite.Require().Equal(serviceID, message.ServiceId)
+
+	// ---------------------------
+	//  semd Data
+	err = client.SendData(streamID, serviceID, data)
+	suite.Require().Nil(err)
+
+	readMessageResult = <-server.ChMessage
+	message, err = readMessageResult.UnmarshalMessage()
+	suite.Require().Nil(err)
+
+	suite.Require().Equal(streamID, message.StreamId)
+	suite.Require().Equal(serviceID, message.ServiceId)
+	suite.Require().Equal(data, message.Payload)
+
+	// ---------------------------
+	//  semd StreamReset
+	err = client.SendStreamReset(streamID, serviceID)
+	suite.Require().Nil(err)
+
+	readMessageResult = <-server.ChMessage
+	message, err = readMessageResult.UnmarshalMessage()
+	suite.Require().Nil(err)
+
+	suite.Require().Equal(streamID, message.StreamId)
+	suite.Require().Equal(serviceID, message.ServiceId)
+}
 
 func defaultOptions() AWSClientOptions {
 
@@ -546,7 +609,7 @@ func defaultOptions() AWSClientOptions {
 	return options
 }
 
-func marshalMessage(messages []*protomsg.Message) ([]byte, error) {
+func marshalMessages(messages []*protomsg.Message) ([]byte, error) {
 
 	messagesBin := make([]byte, 0)
 

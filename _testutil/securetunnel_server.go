@@ -9,12 +9,25 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mizosukedev/securetunnel/protomsg"
+	"google.golang.org/protobuf/proto"
+)
+
+const (
+	sizeOfMessageSize = 2
 )
 
 type ReadMessageResult struct {
 	MessageType int
 	Message     []byte
 	Err         error
+}
+
+func (result *ReadMessageResult) UnmarshalMessage() (*protomsg.Message, error) {
+
+	message := &protomsg.Message{}
+	err := proto.Unmarshal(result.Message[sizeOfMessageSize:], message)
+	return message, err
 }
 
 type SecureTunnelServer struct {
