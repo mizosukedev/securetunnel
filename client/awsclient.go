@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/mizosukedev/securetunnel/log"
+	"github.com/mizosukedev/securetunnel/protomsg"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -45,27 +46,27 @@ type AWSMessageListener interface {
 
 	// OnStreamStart is an event handler that fires when a StreamStart message is received.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#streamstart
-	OnStreamStart(message *Message) error
+	OnStreamStart(message *protomsg.Message) error
 
 	// OnStreamReset is an event handler that fires when a StreamReset message is received.
 	// This method may be executed multiple times with the same stream ID.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#streamreset
-	OnStreamReset(message *Message)
+	OnStreamReset(message *protomsg.Message)
 
 	// OnSessionReset is an event handler that fires when a SessionReset message is received.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#sessionreset
-	OnSessionReset(message *Message)
+	OnSessionReset(message *protomsg.Message)
 
 	// OnData is an event handler that fires when a Data message is received.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#data
-	OnData(message *Message) error
+	OnData(message *protomsg.Message) error
 
 	// OnServiceIDs is an event handler that fires when a ServiceIDs message is received.
 	// 	Note:
 	// 		The server will also send a ServiceIDs message when reconnecting.
 	// 		That is, this method will also be executed when reconnecting.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#serviceids
-	OnServiceIDs(message *Message) error
+	OnServiceIDs(message *protomsg.Message) error
 }
 
 // AWSClient is an interface, for the purpose of connectiong secure tunneling service.
@@ -403,7 +404,7 @@ func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 }
 
 // readMessages read websocket frames, and deserialize.
-func (client *awsClient) readMessages() ([]*Message, error) {
+func (client *awsClient) readMessages() ([]*protomsg.Message, error) {
 
 	// A WebSocket frame may contain multiple tunneling frames,
 	// **or it may contain only a slice of a tunneling frame started
@@ -418,7 +419,7 @@ func (client *awsClient) readMessages() ([]*Message, error) {
 
 	prevMessageBin := []byte(nil)
 	restMessageSize := uint16(0)
-	messages := make([]*Message, 0, 1)
+	messages := make([]*protomsg.Message, 0, 1)
 
 	// loop to read websocket frame.
 	for {
@@ -494,7 +495,7 @@ func (client *awsClient) readMessages() ([]*Message, error) {
 			restMessageSize = 0
 
 			// deserialize
-			message := &Message{}
+			message := &protomsg.Message{}
 			err = proto.Unmarshal(messageBin, message)
 			if err != nil {
 				err = fmt.Errorf("invalid protobuf message format: %w", err)
@@ -512,11 +513,13 @@ func (client *awsClient) readMessages() ([]*Message, error) {
 }
 
 // invokeEvent invoke the appropriate event handler in AWSMessageListener according to the type of message.
-func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message *Message) {
+func (client *awsClient) invokeEvent(
+	messageListener AWSMessageListener,
+	message *protomsg.Message) {
 
 	switch message.Type {
 
-	case Message_STREAM_START:
+	case protomsg.Message_STREAM_START:
 
 		log.Infof(
 			"received StreamStart message -> StreamID=StreamID=%d ServiceID=%s",
@@ -539,7 +542,7 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 			}
 		}
 
-	case Message_DATA:
+	case protomsg.Message_DATA:
 
 		log.Debugf("received Data message StreamID=%d ServiceID=%s", message.StreamId, message.ServiceId)
 
@@ -560,7 +563,7 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 			}
 		})
 
-	case Message_STREAM_RESET:
+	case protomsg.Message_STREAM_RESET:
 
 		log.Warnf(
 			"received StreamReset message -> StreamID=StreamID=%d ServiceID=%s",
@@ -572,11 +575,11 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 			client.workerMng.stop(message.StreamId)
 		})
 
-	case Message_SESSION_RESET:
+	case protomsg.Message_SESSION_RESET:
 		log.Warn("Received SessionReset message")
 		messageListener.OnSessionReset(message)
 
-	case Message_SERVICE_IDS:
+	case protomsg.Message_SERVICE_IDS:
 
 		log.Infof("Received ServiceIDs message ServiceID=%s", message.AvailableServiceIds)
 
@@ -585,7 +588,7 @@ func (client *awsClient) invokeEvent(messageListener AWSMessageListener, message
 			log.Errorf("OnServiceIDs() event failed: %v", err)
 		}
 
-	case Message_UNKNOWN:
+	case protomsg.Message_UNKNOWN:
 		fallthrough
 	default:
 		log.Errorf(
@@ -604,7 +607,7 @@ func (client *awsClient) SendStreamStart(streamID int32, serviceID string) error
 
 	client.workerMng.start(streamID)
 
-	err := client.sendMessage(streamID, serviceID, Message_STREAM_START, nil)
+	err := client.sendMessage(streamID, serviceID, protomsg.Message_STREAM_START, nil)
 	if err != nil {
 		client.workerMng.stop(streamID)
 		err = fmt.Errorf("failed to send StreamStart message: %w", err)
@@ -621,7 +624,7 @@ func (client *awsClient) SendStreamReset(streamID int32, serviceID string) error
 
 	client.workerMng.stop(streamID)
 
-	err := client.sendMessage(streamID, serviceID, Message_STREAM_RESET, nil)
+	err := client.sendMessage(streamID, serviceID, protomsg.Message_STREAM_RESET, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to send StreamReset message: %w", err)
 		return err
@@ -635,7 +638,7 @@ func (client *awsClient) SendData(streamID int32, serviceID string, data []byte)
 
 	log.Debugf("SendData StreamID=%d", streamID)
 
-	err := client.sendMessage(streamID, serviceID, Message_DATA, data)
+	err := client.sendMessage(streamID, serviceID, protomsg.Message_DATA, data)
 	if err != nil {
 		err = fmt.Errorf("failed to send Data message: %w", err)
 		return err
@@ -648,7 +651,7 @@ func (client *awsClient) SendData(streamID int32, serviceID string, data []byte)
 func (client *awsClient) sendMessage(
 	streamID int32,
 	serviceID string,
-	messageType Message_Type,
+	messageType protomsg.Message_Type,
 	data []byte) error {
 
 	client.writeMutex.Lock()
@@ -656,7 +659,7 @@ func (client *awsClient) sendMessage(
 
 	// TODO: Should large messages be split and sent?
 
-	message := &Message{
+	message := &protomsg.Message{
 		StreamId:  streamID,
 		ServiceId: serviceID,
 		Type:      messageType,

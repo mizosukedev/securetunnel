@@ -11,6 +11,7 @@ import (
 
 	"github.com/mizosukedev/securetunnel/client"
 	"github.com/mizosukedev/securetunnel/log"
+	"github.com/mizosukedev/securetunnel/protomsg"
 )
 
 // LocalProxyOptions represents options of LocalProxy.
@@ -203,7 +204,7 @@ func (listener *eventLisnter) OnConnected() {
 // --------------------------------------------
 
 // OnStreamStart Refer to AWSMeesageListener.OnStreamStart
-func (listener *eventLisnter) OnStreamStart(message *client.Message) error {
+func (listener *eventLisnter) OnStreamStart(message *protomsg.Message) error {
 
 	svcConfig, ok := listener.localProxy.serviceMap[message.ServiceId]
 	if !ok {
@@ -227,26 +228,26 @@ func (listener *eventLisnter) OnStreamStart(message *client.Message) error {
 }
 
 // OnStreamReset Refer to AWSMeesageListener.OnStreamReset
-func (listener *eventLisnter) OnStreamReset(message *client.Message) {
+func (listener *eventLisnter) OnStreamReset(message *protomsg.Message) {
 
 	listener.localProxy.socketManager.StopSocket(message.StreamId)
 }
 
 // OnSessionReset Refer to AWSMeesageListener.OnSessionReset
-func (listener *eventLisnter) OnSessionReset(message *client.Message) {
+func (listener *eventLisnter) OnSessionReset(message *protomsg.Message) {
 
 	listener.localProxy.socketManager.StopAll()
 }
 
 // OnData Refer to AWSMeesageListener.OnData
-func (listener *eventLisnter) OnData(message *client.Message) error {
+func (listener *eventLisnter) OnData(message *protomsg.Message) error {
 
 	err := listener.localProxy.socketManager.Write(message.StreamId, message.ServiceId, message.Payload)
 	return err
 }
 
 // OnServiceIDs Refer to AWSMeesageListener.OnServiceIDs
-func (listener *eventLisnter) OnServiceIDs(message *client.Message) error {
+func (listener *eventLisnter) OnServiceIDs(message *protomsg.Message) error {
 
 	if listener.localProxy.mode == client.ModeSource {
 
