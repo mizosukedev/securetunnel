@@ -18,12 +18,13 @@ type ReadMessageResult struct {
 }
 
 type SecureTunnelServer struct {
-	Host        string
-	Endpoint    *url.URL
-	ChRequest   chan *http.Request
-	ChMessage   chan *ReadMessageResult
-	ChWebSocket chan *websocket.Conn
-	ChPing      chan string
+	Host           string
+	Endpoint       *url.URL
+	ChRequest      chan *http.Request
+	ChMessage      chan *ReadMessageResult
+	ChWebSocket    chan *websocket.Conn
+	ChPing         chan string
+	RequestHandler func(w http.ResponseWriter, r *http.Request) (endResponse bool)
 }
 
 func NewSecureTunnelServer() *SecureTunnelServer {
@@ -88,6 +89,13 @@ func (server *SecureTunnelServer) Start(ctx context.Context) {
 func (server *SecureTunnelServer) handleTunnel(w http.ResponseWriter, r *http.Request) {
 
 	server.ChRequest <- r
+
+	if server.RequestHandler != nil {
+		endResponse := server.RequestHandler(w, r)
+		if endResponse {
+			return
+		}
+	}
 
 	upgrader := websocket.Upgrader{}
 	ws, err := upgrader.Upgrade(w, r, nil)

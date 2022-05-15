@@ -181,19 +181,20 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 
 // awsClient is a structure that implements AWSClient interface.
 type awsClient struct {
-	mode              Mode
-	endpoint          *url.URL
-	token             string
-	dialTimeout       time.Duration
-	reconnectInterval time.Duration
-	pingInterval      time.Duration
-	messageListeners  []AWSMessageListener
-	connectHandlers   []func()
-	dialer            *websocket.Dialer
-	requestHeader     http.Header
-	con               *websocket.Conn
-	writeMutex        *sync.Mutex // for websocket.WriteMessage()
-	workerMng         *workerManager
+	mode                  Mode
+	endpoint              *url.URL
+	token                 string
+	dialTimeout           time.Duration
+	reconnectInterval     time.Duration
+	pingInterval          time.Duration
+	messageListeners      []AWSMessageListener
+	connectHandlers       []func()
+	dialer                *websocket.Dialer
+	requestHeader         http.Header
+	con                   *websocket.Conn
+	writeMutex            *sync.Mutex             // for websocket.WriteMessage()
+	workerMng             *workerManager          //
+	unknownMessageHandler func(*protomsg.Message) // for unit testing
 }
 
 // Run Refer to AWSClient.
@@ -610,6 +611,11 @@ func (client *awsClient) invokeEvent(
 			message.StreamId,
 			message.Type,
 			message.Payload)
+
+		// for unit testing
+		if client.unknownMessageHandler != nil {
+			client.unknownMessageHandler(message)
+		}
 	}
 
 }
@@ -740,7 +746,7 @@ func (conErr *connectError) Error() string {
 	}
 
 	message := fmt.Sprintf(
-		"failed to connect. url=%v header=%v cause=%v",
+		"failed to connect to ->%v header=%v cause=%v",
 		conErr.url,
 		responseHeader,
 		conErr.causeErr)

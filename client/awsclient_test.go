@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -20,6 +21,132 @@ type AWSClientTest struct {
 
 func TestAWSClient(t *testing.T) {
 	suite.Run(t, new(AWSClientTest))
+}
+
+// TextConnect confirm the request header when the AWSClient connects.
+func (suite *AWSClientTest) TestConnect() {
+
+	server := testutil.NewSecureTunnelServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server.Start(ctx)
+
+	chConnected := make(chan struct{}, 1)
+
+	messageListener := NewMockAWSMessageListener()
+
+	options := defaultOptions()
+	options.Endpoint = server.Endpoint
+	options.MessageListeners = []AWSMessageListener{messageListener}
+	options.ConnectHandlers = []func(){
+		func() {
+			chConnected <- struct{}{}
+		},
+	}
+
+	// --------------------------
+	//  Connect success
+
+	client, err := NewAWSClient(options)
+	suite.Require().Nil(err)
+	clientCtx, clientCancel := context.WithCancel(context.Background())
+	defer clientCancel()
+	chClientTerminate := make(chan struct{}, 1)
+
+	go func() {
+		err := client.Run(clientCtx)
+		suite.Require().Nil(err)
+		chClientTerminate <- struct{}{}
+	}()
+
+	// wait for connection
+	<-chConnected
+
+	request := <-server.ChRequest
+
+	// check request header
+	suite.Require().Equal(string(ModeDestination), request.FormValue(queryKeyProxyMode))
+	suite.Require().Equal([]string{options.Token}, request.Header["Access-Token"])
+	suite.Require().Equal(subProtocols, request.Header["Sec-Websocket-Protocol"])
+
+	// wait for ping
+	<-server.ChPing
+
+	clientCancel()
+	<-chClientTerminate
+}
+
+// TestReconnect confirm that AWS Client reconnects properly.
+func (suite *AWSClientTest) TestReconnect() {
+
+	type response struct {
+		statusCode   int
+		tunnelClosed bool
+	}
+
+	tests := []struct {
+		name       string
+		response   response
+		wantRetry  bool
+		wantRunErr bool
+	}{
+		{"status 399", response{399, false}, true, false},
+		{"status 400", response{400, false}, false, true},
+		{"tunnel closed", response{403, true}, false, true},
+		{"status 499", response{499, false}, false, true},
+		{"status 500", response{500, false}, true, false},
+	}
+
+	for _, test := range tests {
+
+		server := testutil.NewSecureTunnelServer()
+		ctx, cancel := context.WithCancel(context.Background())
+
+		server.Start(ctx)
+
+		messageListener := NewMockAWSMessageListener()
+
+		options := defaultOptions()
+		options.Endpoint = server.Endpoint
+		options.MessageListeners = []AWSMessageListener{messageListener}
+
+		server.RequestHandler = func(w http.ResponseWriter, r *http.Request) bool {
+			if test.response.tunnelClosed {
+				w.Header().Set(headerKeyStatusReason, statusReasonTunnelClosed)
+			}
+			w.WriteHeader(test.response.statusCode)
+			return true
+		}
+
+		client, err := NewAWSClient(options)
+		suite.Require().Nil(err)
+
+		chClientTerminate := make(chan struct{}, 1)
+
+		go func() {
+			err := client.Run(ctx)
+
+			if test.wantRunErr {
+				suite.Require().NotNil(err)
+			} else {
+				suite.Require().Nil(err)
+			}
+
+			chClientTerminate <- struct{}{}
+		}()
+
+		if test.wantRetry {
+			<-server.ChRequest // first connection
+			<-server.ChRequest // retry
+			cancel()
+			<-chClientTerminate
+		} else {
+			<-chClientTerminate
+		}
+
+		cancel()
+	}
 }
 
 // TestReceivedMessage confirm that AWSClient execute AWSMessageListener's event handler,
@@ -54,12 +181,6 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	<-chConnected
 
 	ws := <-server.ChWebSocket
-	request := <-server.ChRequest
-
-	// check request header
-	suite.Require().Equal(string(ModeDestination), request.FormValue(queryKeyProxyMode))
-	suite.Require().Equal([]string{options.Token}, request.Header["Access-Token"])
-	suite.Require().Equal(subProtocols, request.Header["Sec-Websocket-Protocol"])
 
 	// wait for ping
 	<-server.ChPing
@@ -90,7 +211,6 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 		ServiceId: "serviceID1",
 		Type:      protomsg.Message_DATA,
 		Payload:   []byte("01234567890123456789012345678901234567890123456789"),
-		Ignorable: false,
 	}
 
 	messagesBin, err = marshalMessage([]*protomsg.Message{dataMessage})
@@ -173,6 +293,7 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	<-messageListener.ChSessionResetArg
 	receivedServiceIDsMessage := <-messageListener.ChServiceIDsArg
 	suite.Require().Equal(receivedServiceIDsMessage.AvailableServiceIds, serviceIDsMessage.AvailableServiceIds)
+
 }
 
 // TestReceivedMessageListenerReturnsError confirm the behavior
@@ -224,7 +345,6 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 		StreamId:  1,
 		ServiceId: "serviceID1",
 		Type:      protomsg.Message_STREAM_START,
-		Ignorable: false,
 	}
 	messagesBin, err := marshalMessage([]*protomsg.Message{streamStartMessage})
 	suite.Require().Nil(err)
@@ -234,6 +354,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 
 	<-messageListener.ChStreamStartArg
 
+	// confirm that AWSClient send StreamReset message.
 	readMessageResult := <-server.ChMessage
 	streamResetMessage := &protomsg.Message{}
 	err = proto.Unmarshal(readMessageResult.Message[sizeOfMessageSize:], streamResetMessage)
@@ -256,7 +377,6 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 		ServiceId: "serviceID1",
 		Type:      protomsg.Message_DATA,
 		Payload:   []byte{},
-		Ignorable: false,
 	}
 
 	messagesBin, err = marshalMessage([]*protomsg.Message{streamStartMessage, dataMessage})
@@ -265,6 +385,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
 	suite.Require().Nil(err)
 
+	// confirm that AWSClient send StreamReset message.
 	readMessageResult = <-server.ChMessage
 	dataMessage = &protomsg.Message{}
 	err = proto.Unmarshal(readMessageResult.Message[sizeOfMessageSize:], dataMessage)
@@ -300,7 +421,6 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	serviceIDsMessage := &protomsg.Message{
 		Type:                protomsg.Message_DATA,
 		AvailableServiceIds: []string{},
-		Ignorable:           false,
 	}
 
 	messagesBin, err = marshalMessage([]*protomsg.Message{serviceIDsMessage})
@@ -312,6 +432,96 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	messageListener.MockServiceIDs = func(message *protomsg.Message) error {
 		return nil
 	}
+}
+
+// TestReceivedMessageListenerReturnsError confirm the behavior
+// when AWSClient received invalid messages.
+func (suite *AWSClientTest) TestReceivedInvalidMessage() {
+
+	server := testutil.NewSecureTunnelServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server.Start(ctx)
+
+	chConnected := make(chan struct{}, 1)
+
+	messageListener := NewMockAWSMessageListener()
+
+	options := defaultOptions()
+	options.Endpoint = server.Endpoint
+	options.MessageListeners = []AWSMessageListener{messageListener}
+	options.ConnectHandlers = []func(){
+		func() {
+			chConnected <- struct{}{}
+		},
+	}
+
+	client, err := NewAWSClient(options)
+	suite.Require().Nil(err)
+
+	go client.Run(ctx)
+
+	// wait for connection
+	<-chConnected
+	ws := <-server.ChWebSocket
+
+	// -----------------------------
+	//  text message
+	sessionResetMessage := &protomsg.Message{
+		Type: protomsg.Message_SESSION_RESET,
+	}
+	messagesBin, err := marshalMessage([]*protomsg.Message{sessionResetMessage})
+	suite.Require().Nil(err)
+
+	err = ws.WriteMessage(websocket.TextMessage, messagesBin)
+	suite.Require().Nil(err)
+
+	// confirm reconnection
+	<-chConnected
+	ws = <-server.ChWebSocket
+
+	// -----------------------------
+	//  receive unknown message
+	chUnknownMessage := make(chan struct{}, 1)
+	client.(*awsClient).unknownMessageHandler = func(message *protomsg.Message) {
+		close(chUnknownMessage)
+	}
+
+	unknownMessage := &protomsg.Message{
+		Type:    protomsg.Message_UNKNOWN,
+		Payload: []byte("a"),
+	}
+
+	messagesBin, err = marshalMessage([]*protomsg.Message{unknownMessage})
+	suite.Require().Nil(err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
+	suite.Require().Nil(err)
+
+	<-chUnknownMessage
+
+	client.(*awsClient).unknownMessageHandler = func(message *protomsg.Message) {}
+
+	// -----------------------------
+	//  ignorable message
+	ignorableMessage := &protomsg.Message{
+		StreamId:  1,
+		ServiceId: "service1",
+		Type:      protomsg.Message_STREAM_START,
+		Ignorable: true,
+	}
+
+	messagesBin, err = marshalMessage([]*protomsg.Message{ignorableMessage, sessionResetMessage})
+	suite.Require().Nil(err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
+	suite.Require().Nil(err)
+
+	<-messageListener.ChSessionResetArg
+
+	suite.Require().Len(messageListener.ChStreamStartArg, 0)
+
 }
 
 // sendMessage
