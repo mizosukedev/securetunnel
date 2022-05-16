@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/mizosukedev/securetunnel/protomsg"
+	"github.com/mizosukedev/securetunnel/aws"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,9 +23,9 @@ type ReadMessageResult struct {
 	Err         error
 }
 
-func (result *ReadMessageResult) UnmarshalMessage() (*protomsg.Message, error) {
+func (result *ReadMessageResult) UnmarshalMessage() (*aws.Message, error) {
 
-	message := &protomsg.Message{}
+	message := &aws.Message{}
 	err := proto.Unmarshal(result.Message[sizeOfMessageSize:], message)
 	return message, err
 }

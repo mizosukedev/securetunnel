@@ -15,6 +15,6 @@
 # vendor/
 
 .vscode/
-protomsg/Message.proto
+proto/Message.proto
 bin/
 __debug_bin

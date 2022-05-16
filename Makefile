@@ -7,11 +7,11 @@ PROTOC_GEN_GO := $(shell command -v protoc-gen-go)
 # AWS secure tunneling message file.
 SECURE_TUNNEL_VERSION := v2.1.0
 PROTO_FILE_URL        := https://raw.githubusercontent.com/aws-samples/aws-iot-securetunneling-localproxy/$(SECURE_TUNNEL_VERSION)/resources/Message.proto
-PROTO_FILE_DIR        := $(CURDIR)/protomsg
+PROTO_FILE_DIR        := $(CURDIR)/proto
 PROTO_FILE_NAME       := Message.proto
-PROTO_GO_PACKAGE      := github.com/mizosukedev/securetunnel/protomsg
+PROTO_GO_PACKAGE      := github.com/mizosukedev/securetunnel/aws
 PROTO_FILE_PATH       := $(PROTO_FILE_DIR)/$(PROTO_FILE_NAME)
-MESSAGE_FILE_OUT_DIR  := $(CURDIR)/protomsg
+MESSAGE_FILE_OUT_DIR  := $(CURDIR)/aws
 
 # Build
 GOOS       ?= $(shell go env GOOS)
