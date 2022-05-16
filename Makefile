@@ -74,6 +74,9 @@ update-proto: install-tools $(PROTO_FILE_PATH)
 		--go_out="$(MESSAGE_FILE_OUT_DIR)"                 \
 		"$(PROTO_FILE_NAME)"
 
+lint-on-docker:
+	docker run --rm -v "$(CURDIR):/app" -w /app golangci/golangci-lint:latest golangci-lint run -v
+
 clean:
 	rm -f $(PROTO_FILE_PATH)
 	rm -f $(BIN_PREFIX)*

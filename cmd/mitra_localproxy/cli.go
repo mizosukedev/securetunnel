@@ -157,7 +157,7 @@ func setupCLI() arguments {
 		strBuilder.WriteString("Flags:\n")
 		strBuilder.WriteString(flagUsages)
 
-		fmt.Fprintf(os.Stderr, strBuilder.String())
+		fmt.Fprint(os.Stderr, strBuilder.String())
 	}
 
 	// delete 'pflag: help requested'

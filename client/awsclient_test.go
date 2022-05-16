@@ -177,7 +177,9 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	client, err := NewAWSClient(options)
 	suite.Require().Nil(err)
 
-	go client.Run(ctx)
+	go func() {
+		_ = client.Run(ctx)
+	}()
 
 	// wait for connection
 	<-chConnected
@@ -291,7 +293,6 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	<-messageListener.ChSessionResetArg
 	receivedServiceIDsMessage := <-messageListener.ChServiceIDsArg
 	suite.Require().Equal(receivedServiceIDsMessage.AvailableServiceIds, serviceIDsMessage.AvailableServiceIds)
-
 }
 
 // TestReceivedMessageListenerReturnsError confirm the behavior
@@ -320,7 +321,9 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	client, err := NewAWSClient(options)
 	suite.Require().Nil(err)
 
-	go client.Run(ctx)
+	go func() {
+		_ = client.Run(ctx)
+	}()
 
 	// wait for connection
 	<-chConnected
@@ -456,7 +459,9 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 	client, err := NewAWSClient(options)
 	suite.Require().Nil(err)
 
-	go client.Run(ctx)
+	go func() {
+		_ = client.Run(ctx)
+	}()
 
 	// wait for connection
 	<-chConnected
@@ -517,7 +522,6 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 	<-messageListener.ChSessionResetArg
 
 	suite.Require().Len(messageListener.ChStreamStartArg, 0)
-
 }
 
 func (suite *AWSClientTest) TestSendMessage() {
@@ -545,7 +549,7 @@ func (suite *AWSClientTest) TestSendMessage() {
 	suite.Require().Nil(err)
 
 	go func() {
-		client.Run(ctx)
+		_ = client.Run(ctx)
 	}()
 
 	// wait for connection

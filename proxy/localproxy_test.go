@@ -28,7 +28,10 @@ func ExampleLocalProxy() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	localProxy.Run(ctx)
+	err = localProxy.Run(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func TestLocalProxy(t *testing.T) {

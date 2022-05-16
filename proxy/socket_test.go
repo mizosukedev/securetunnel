@@ -60,11 +60,14 @@ func (suite *LocalSocketTest) TestNormal() {
 		<-chClientDone
 		socket.Stop()
 	})
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	suite.Require().Nil(err)
 
 	con, err := testutil.ConnectTCPServer(listener.Addr().String())
+	suite.Require().Nil(err)
 
 	socketReader := NewMockSocketReader()
 	socket := newLocalSocket(streamID, serviceID, con, socketReader, bufSize)
@@ -139,11 +142,14 @@ func (suite *LocalSocketTest) TestOnReadDataError() {
 
 		socket.Stop()
 	})
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	suite.Require().Nil(err)
 
 	con, err := testutil.ConnectTCPServer(listener.Addr().String())
+	suite.Require().Nil(err)
 
 	socketReader := NewMockSocketReader()
 	// OnReadData returns error
