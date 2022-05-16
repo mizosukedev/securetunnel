@@ -40,7 +40,9 @@ func (suite *LocalSocketManagerTest) TestNormal() {
 		_, err = con.Write(readData)
 		suite.Require().Nil(err)
 	})
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	suite.Require().Nil(err)
 
@@ -104,7 +106,9 @@ func (suite *LocalSocketManagerTest) TestStartSocketStreamIDExists() {
 
 	listener, err := testutil.StartTCPServer(ctx, func(con net.Conn) {
 	})
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	suite.Require().Nil(err)
 

@@ -60,7 +60,9 @@ func (suite *LocalSocketTest) TestNormal() {
 		<-chClientDone
 		socket.Stop()
 	})
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	suite.Require().Nil(err)
 
@@ -139,7 +141,9 @@ func (suite *LocalSocketTest) TestOnReadDataError() {
 
 		socket.Stop()
 	})
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	suite.Require().Nil(err)
 
