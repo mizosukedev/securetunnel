@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	testutil "github.com/mizosukedev/securetunnel/_testutil"
-	"github.com/mizosukedev/securetunnel/protomsg"
+	"github.com/mizosukedev/securetunnel/aws"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/proto"
 )
@@ -191,12 +191,12 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 
 	// -----------------------------
 	//  receive StreamStart message
-	streamStartMessage := &protomsg.Message{
+	streamStartMessage := &aws.Message{
 		StreamId:  1,
 		ServiceId: "serviceID1",
-		Type:      protomsg.Message_STREAM_START,
+		Type:      aws.Message_STREAM_START,
 	}
-	messagesBin, err := marshalMessages([]*protomsg.Message{streamStartMessage})
+	messagesBin, err := marshalMessages([]*aws.Message{streamStartMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -209,14 +209,14 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	// -----------------------------
 	//  received a message divided into multiple websocket frames.
 	//  receive Data message
-	dataMessage := &protomsg.Message{
+	dataMessage := &aws.Message{
 		StreamId:  1,
 		ServiceId: "serviceID1",
-		Type:      protomsg.Message_DATA,
+		Type:      aws.Message_DATA,
 		Payload:   []byte("01234567890123456789012345678901234567890123456789"),
 	}
 
-	messagesBin, err = marshalMessages([]*protomsg.Message{dataMessage})
+	messagesBin, err = marshalMessages([]*aws.Message{dataMessage})
 	suite.Require().Nil(err)
 
 	// divide message
@@ -236,12 +236,12 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 
 	// -----------------------------
 	//  receive StreamReset message
-	streamResetMessage := &protomsg.Message{
+	streamResetMessage := &aws.Message{
 		StreamId:  1,
 		ServiceId: "serviceID2",
-		Type:      protomsg.Message_STREAM_RESET,
+		Type:      aws.Message_STREAM_RESET,
 	}
-	messagesBin, err = marshalMessages([]*protomsg.Message{streamResetMessage})
+	messagesBin, err = marshalMessages([]*aws.Message{streamResetMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -270,16 +270,16 @@ func (suite *AWSClientTest) TestReceivedMessage() {
 	//  receive multiple messages in a websocket frame
 	//  receive SessionReset message
 	//  receive ServiceIDs message
-	sessionResetMessage := &protomsg.Message{
-		Type: protomsg.Message_SESSION_RESET,
+	sessionResetMessage := &aws.Message{
+		Type: aws.Message_SESSION_RESET,
 	}
 
-	serviceIDsMessage := &protomsg.Message{
+	serviceIDsMessage := &aws.Message{
 		AvailableServiceIds: []string{"service1", "service2"},
-		Type:                protomsg.Message_SERVICE_IDS,
+		Type:                aws.Message_SERVICE_IDS,
 	}
 
-	messages := []*protomsg.Message{
+	messages := []*aws.Message{
 		sessionResetMessage,
 		serviceIDsMessage,
 	}
@@ -338,16 +338,16 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 
 	// -----------------------------
 	//  StreamStart message
-	messageListener.MockOnStreamStart = func(message *protomsg.Message) error {
+	messageListener.MockOnStreamStart = func(message *aws.Message) error {
 		return errors.New("test error")
 	}
 
-	streamStartMessage := &protomsg.Message{
+	streamStartMessage := &aws.Message{
 		StreamId:  1,
 		ServiceId: "serviceID1",
-		Type:      protomsg.Message_STREAM_START,
+		Type:      aws.Message_STREAM_START,
 	}
-	messagesBin, err := marshalMessages([]*protomsg.Message{streamStartMessage})
+	messagesBin, err := marshalMessages([]*aws.Message{streamStartMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -359,27 +359,27 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	readMessageResult := <-server.ChMessage
 	streamResetMessage, err := readMessageResult.UnmarshalMessage()
 	suite.Require().Nil(err)
-	suite.Require().Equal(protomsg.Message_STREAM_RESET, streamResetMessage.Type)
+	suite.Require().Equal(aws.Message_STREAM_RESET, streamResetMessage.Type)
 	suite.Require().Equal(streamStartMessage.StreamId, streamResetMessage.StreamId)
 
-	messageListener.MockOnStreamStart = func(message *protomsg.Message) error {
+	messageListener.MockOnStreamStart = func(message *aws.Message) error {
 		return nil
 	}
 
 	// -----------------------------
 	//  Data message
-	messageListener.MockOnData = func(message *protomsg.Message) error {
+	messageListener.MockOnData = func(message *aws.Message) error {
 		return errors.New("test error")
 	}
 
-	dataMessage := &protomsg.Message{
+	dataMessage := &aws.Message{
 		StreamId:  1,
 		ServiceId: "serviceID1",
-		Type:      protomsg.Message_DATA,
+		Type:      aws.Message_DATA,
 		Payload:   []byte{},
 	}
 
-	messagesBin, err = marshalMessages([]*protomsg.Message{streamStartMessage, dataMessage})
+	messagesBin, err = marshalMessages([]*aws.Message{streamStartMessage, dataMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -389,7 +389,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	readMessageResult = <-server.ChMessage
 	dataMessage, err = readMessageResult.UnmarshalMessage()
 	suite.Require().Nil(err)
-	suite.Require().Equal(protomsg.Message_STREAM_RESET, dataMessage.Type)
+	suite.Require().Equal(aws.Message_STREAM_RESET, dataMessage.Type)
 	suite.Require().Equal(streamStartMessage.StreamId, dataMessage.StreamId)
 
 	// confirm that Worker was stopped
@@ -407,28 +407,28 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 
 	suite.Require().True(stopped)
 
-	messageListener.MockOnData = func(message *protomsg.Message) error {
+	messageListener.MockOnData = func(message *aws.Message) error {
 		return nil
 	}
 
 	// -----------------------------
 	//  ServiceIDs message
-	messageListener.MockServiceIDs = func(message *protomsg.Message) error {
+	messageListener.MockServiceIDs = func(message *aws.Message) error {
 		return errors.New("test error")
 	}
 
-	serviceIDsMessage := &protomsg.Message{
-		Type:                protomsg.Message_DATA,
+	serviceIDsMessage := &aws.Message{
+		Type:                aws.Message_DATA,
 		AvailableServiceIds: []string{},
 	}
 
-	messagesBin, err = marshalMessages([]*protomsg.Message{serviceIDsMessage})
+	messagesBin, err = marshalMessages([]*aws.Message{serviceIDsMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
 	suite.Require().Nil(err)
 
-	messageListener.MockServiceIDs = func(message *protomsg.Message) error {
+	messageListener.MockServiceIDs = func(message *aws.Message) error {
 		return nil
 	}
 }
@@ -469,10 +469,10 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 
 	// -----------------------------
 	//  text message
-	sessionResetMessage := &protomsg.Message{
-		Type: protomsg.Message_SESSION_RESET,
+	sessionResetMessage := &aws.Message{
+		Type: aws.Message_SESSION_RESET,
 	}
-	messagesBin, err := marshalMessages([]*protomsg.Message{sessionResetMessage})
+	messagesBin, err := marshalMessages([]*aws.Message{sessionResetMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.TextMessage, messagesBin)
@@ -485,16 +485,16 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 	// -----------------------------
 	//  receive unknown message
 	chUnknownMessage := make(chan struct{}, 1)
-	client.(*awsClient).unknownMessageHandler = func(message *protomsg.Message) {
+	client.(*awsClient).unknownMessageHandler = func(message *aws.Message) {
 		close(chUnknownMessage)
 	}
 
-	unknownMessage := &protomsg.Message{
-		Type:    protomsg.Message_UNKNOWN,
+	unknownMessage := &aws.Message{
+		Type:    aws.Message_UNKNOWN,
 		Payload: []byte("a"),
 	}
 
-	messagesBin, err = marshalMessages([]*protomsg.Message{unknownMessage})
+	messagesBin, err = marshalMessages([]*aws.Message{unknownMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -502,18 +502,18 @@ func (suite *AWSClientTest) TestReceivedInvalidMessage() {
 
 	<-chUnknownMessage
 
-	client.(*awsClient).unknownMessageHandler = func(message *protomsg.Message) {}
+	client.(*awsClient).unknownMessageHandler = func(message *aws.Message) {}
 
 	// -----------------------------
 	//  ignorable message
-	ignorableMessage := &protomsg.Message{
+	ignorableMessage := &aws.Message{
 		StreamId:  1,
 		ServiceId: "service1",
-		Type:      protomsg.Message_STREAM_START,
+		Type:      aws.Message_STREAM_START,
 		Ignorable: true,
 	}
 
-	messagesBin, err = marshalMessages([]*protomsg.Message{ignorableMessage, sessionResetMessage})
+	messagesBin, err = marshalMessages([]*aws.Message{ignorableMessage, sessionResetMessage})
 	suite.Require().Nil(err)
 
 	err = ws.WriteMessage(websocket.BinaryMessage, messagesBin)
@@ -613,7 +613,7 @@ func defaultOptions() AWSClientOptions {
 	return options
 }
 
-func marshalMessages(messages []*protomsg.Message) ([]byte, error) {
+func marshalMessages(messages []*aws.Message) ([]byte, error) {
 
 	messagesBin := make([]byte, 0)
 

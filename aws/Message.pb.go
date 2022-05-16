@@ -7,7 +7,7 @@
 // 	protoc        v3.6.1
 // source: Message.proto
 
-package protomsg
+package aws
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
