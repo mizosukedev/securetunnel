@@ -1,4 +1,4 @@
-# AWS IoT secure tunneling implementation
+# AWS IoT secure tunneling localproxy implementation
 - This is a repository created for studying for rehabilitation.
 - I do not speak English, so corrections in English are welcome.
 
@@ -35,7 +35,20 @@
     ```
 
 ### Usage
-- Source mode exmample:
+
+#### Forward proxy
+- Setup forward proxy, if you need. The forward proxy can be specified with the `http_proxy` and `https_proxy` environment variables.
+
+- Exxample
+
+    ``` sh
+    $ proxy=http://[proxy host address]:[proxy port]
+    $ export https_proxy=${proxy}
+    $ export http_proxy=${proxy}
+    ```
+
+#### Source mode
+- Exmample:
 
     ``` sh
     $ export MITRA_LOCALPROXY_TOKEN=<set source token>
@@ -47,7 +60,8 @@
     $ mitra_localproxy -e "wss://data.tunneling.iot.us-east-1.amazonaws.com:443/tunnel" -s "SSH=10022, RDP=13389"
     ```
 
-- Destination mode example:
+#### Destination mode
+- Example:
 
     ``` sh
     $ export MITRA_LOCALPROXY_TOKEN=<set destination token>
