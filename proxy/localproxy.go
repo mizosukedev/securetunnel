@@ -56,6 +56,11 @@ func (options LocalProxyOptions) Validate() error {
 		return err
 	}
 
+	if options.Endpoint == nil {
+		err := errors.New("Endpoint is nil")
+		return err
+	}
+
 	switch options.Endpoint.Scheme {
 	case "ws", "wss":
 	default:
@@ -65,11 +70,6 @@ func (options LocalProxyOptions) Validate() error {
 
 	if len(options.ServiceConfigs) == 0 {
 		err := errors.New("ServiceConfigs is empty")
-		return err
-	}
-
-	if options.Endpoint == nil {
-		err := errors.New("Endpoint is nil")
 		return err
 	}
 
