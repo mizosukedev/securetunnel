@@ -29,12 +29,12 @@ func main() {
 
 	args := setupCLI()
 
+	err := setupLogger(args.logLevel)
+	exitOnError(err)
+
 	args.dump()
 
 	options, err := createProxyOptions(args)
-	exitOnError(err)
-
-	err = setupLogger(args.logLevel)
 	exitOnError(err)
 
 	err = options.Validate()

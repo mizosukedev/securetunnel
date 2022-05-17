@@ -1,4 +1,4 @@
-# AWS IoT secure tunneling
+# AWS IoT secure tunneling implementation
 - This is a repository created for studying for rehabilitation.
 - I do not speak English, so corrections in English are welcome.
 
