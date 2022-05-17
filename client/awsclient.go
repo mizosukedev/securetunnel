@@ -3,12 +3,14 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -22,6 +24,7 @@ const (
 	queryKeyProxyMode        = "local-proxy-mode"
 	subProtocolV2            = "aws.iot.securetunneling-2.0"
 	headerKeyAccessToken     = "access-token"
+	headerKeyClientToken     = "client-token"
 	headerKeyStatusReason    = "X-Status-Reason"
 	statusReasonTunnelClosed = "Tunnel is closed"
 	sizeOfMessageSize        = 2
@@ -151,8 +154,11 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 	dialer.TLSClientConfig = tlsConfig
 	dialer.Subprotocols = subProtocols
 
+	clientToken := clientToken(options.Token)
+
 	requestHeader := http.Header{
 		headerKeyAccessToken: []string{options.Token},
+		headerKeyClientToken: []string{clientToken},
 	}
 
 	workerMng := &workerManager{
@@ -781,4 +787,18 @@ func (conErr *connectError) retryable() bool {
 	}
 
 	return true
+}
+
+func clientToken(token string) string {
+
+	hostName, err := os.Hostname()
+	if err != nil {
+		hostName = ""
+	}
+
+	data := fmt.Sprintf("%s:%s", token, hostName)
+	hash := sha256.Sum256([]byte(data))
+	clientToken := fmt.Sprintf("%x", hash)
+
+	return string(clientToken)
 }
