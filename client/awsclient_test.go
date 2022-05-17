@@ -67,9 +67,9 @@ func (suite *AWSClientTest) TestConnect() {
 	request := <-server.ChRequest
 
 	// check request header
-	suite.Require().Equal(string(ModeDestination), request.FormValue(queryKeyProxyMode))
+	suite.Require().Equal(string(ModeDestination), request.FormValue(aws.QueryKeyProxyMode))
 	suite.Require().Equal([]string{options.Token}, request.Header["Access-Token"])
-	suite.Require().Equal(subProtocols, request.Header["Sec-Websocket-Protocol"])
+	suite.Require().Equal(aws.SubProtocols, request.Header["Sec-Websocket-Protocol"])
 
 	// wait for ping
 	<-server.ChPing
@@ -114,7 +114,7 @@ func (suite *AWSClientTest) TestReconnect() {
 
 		server.RequestHandler = func(w http.ResponseWriter, r *http.Request) bool {
 			if test.response.tunnelClosed {
-				w.Header().Set(headerKeyStatusReason, statusReasonTunnelClosed)
+				w.Header().Set(aws.HeaderKeyStatusReason, aws.StatusReasonTunnelClosed)
 			}
 			w.WriteHeader(test.response.statusCode)
 			return true
@@ -332,9 +332,9 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	request := <-server.ChRequest
 
 	// check request header
-	suite.Require().Equal(string(ModeDestination), request.FormValue(queryKeyProxyMode))
+	suite.Require().Equal(string(ModeDestination), request.FormValue(aws.QueryKeyProxyMode))
 	suite.Require().Equal([]string{options.Token}, request.Header["Access-Token"])
-	suite.Require().Equal(subProtocols, request.Header["Sec-Websocket-Protocol"])
+	suite.Require().Equal(aws.SubProtocols, request.Header["Sec-Websocket-Protocol"])
 
 	// -----------------------------
 	//  StreamStart message
@@ -624,7 +624,7 @@ func marshalMessages(messages []*aws.Message) ([]byte, error) {
 			return nil, err
 		}
 
-		sizeBin := make([]byte, sizeOfMessageSize)
+		sizeBin := make([]byte, aws.SizeOfMessageSize)
 		binary.BigEndian.PutUint16(sizeBin, uint16(len(messageBin)))
 
 		messagesBin = append(messagesBin, sizeBin...)

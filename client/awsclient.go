@@ -21,25 +21,8 @@ import (
 )
 
 const (
-	queryKeyProxyMode        = "local-proxy-mode"
-	subProtocolV2            = "aws.iot.securetunneling-2.0"
-	headerKeyAccessToken     = "access-token"
-	headerKeyClientToken     = "client-token"
-	headerKeyStatusReason    = "X-Status-Reason"
-	statusReasonTunnelClosed = "Tunnel is closed"
-	sizeOfMessageSize        = 2
-	maxWebSocketFrameSize    = 131076
-	pingTimeout              = time.Second * 3
-
+	pingTimeout               = time.Second * 3
 	channelBufSizePerStreamID = 10
-)
-
-var (
-	subProtocols = []string{
-		subProtocolV2,
-	}
-
-	ErrTunnelClosed = errors.New("Tunnel is closed")
 )
 
 // AWSMessageListener is an interface representing event handlers to be fired
@@ -141,7 +124,7 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 
 	// create query parameter -> wss://xxx.xxx/xxx?local-proxy-mode=destination or source
 	query := endpoint.Query()
-	query.Add(queryKeyProxyMode, string(options.Mode))
+	query.Add(aws.QueryKeyProxyMode, string(options.Mode))
 	endpoint.RawQuery = query.Encode()
 
 	tlsConfig := options.TLSConfig
@@ -152,13 +135,13 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 	cloneDefaultDialer := *websocket.DefaultDialer
 	dialer := &cloneDefaultDialer
 	dialer.TLSClientConfig = tlsConfig
-	dialer.Subprotocols = subProtocols
+	dialer.Subprotocols = aws.SubProtocols
 
 	clientToken := clientToken(options.Token)
 
 	requestHeader := http.Header{
-		headerKeyAccessToken: []string{options.Token},
-		headerKeyClientToken: []string{clientToken},
+		aws.HeaderKeyAccessToken: []string{options.Token},
+		aws.HeaderKeyClientToken: []string{clientToken},
 	}
 
 	workerMng := &workerManager{
@@ -214,7 +197,7 @@ func (client *awsClient) Run(ctx context.Context) error {
 			if conErr, ok := err.(*connectError); ok {
 				// tunnel is closed
 				if conErr.tunnelClosed() {
-					return ErrTunnelClosed
+					return aws.ErrTunnelClosed
 				}
 
 				// can not retry
@@ -336,7 +319,7 @@ func (client *awsClient) connect(ctx context.Context) error {
 
 	// WebSocket frames of up to 131076 bytes may be sent to clients
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#websocket-subprotocol-awsiotsecuretunneling-20
-	con.SetReadLimit(maxWebSocketFrameSize)
+	con.SetReadLimit(aws.MaxWebSocketFrameSize)
 
 	con.SetCloseHandler(func(code int, text string) error {
 		log.Warnf("close websocket connection from server. code=%d error=%s", code, text)
@@ -460,7 +443,7 @@ func (client *awsClient) readMessages() ([]*aws.Message, error) {
 
 			if restMessageSize == 0 {
 				// message size
-				messageSizeBin := make([]byte, sizeOfMessageSize)
+				messageSizeBin := make([]byte, aws.SizeOfMessageSize)
 				_, err := reader.Read(messageSizeBin)
 				if err != nil {
 					err = fmt.Errorf("failed to read message size in websocket frame: %w", err)
@@ -700,7 +683,7 @@ func (client *awsClient) sendMessage(
 	}
 
 	// size
-	sizeBin := make([]byte, sizeOfMessageSize)
+	sizeBin := make([]byte, aws.SizeOfMessageSize)
 	binary.BigEndian.PutUint16(sizeBin, uint16(len(messageBin)))
 
 	// format message size+message
@@ -764,8 +747,8 @@ func (conErr *connectError) Error() string {
 func (conErr *connectError) tunnelClosed() bool {
 
 	if conErr.response != nil {
-		status := conErr.response.Header.Get(headerKeyStatusReason)
-		result := (status == statusReasonTunnelClosed)
+		status := conErr.response.Header.Get(aws.HeaderKeyStatusReason)
+		result := (status == aws.StatusReasonTunnelClosed)
 		return result
 	}
 

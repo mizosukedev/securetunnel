@@ -13,10 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	sizeOfMessageSize = 2
-)
-
 type ReadMessageResult struct {
 	MessageType int
 	Message     []byte
@@ -26,7 +22,7 @@ type ReadMessageResult struct {
 func (result *ReadMessageResult) UnmarshalMessage() (*aws.Message, error) {
 
 	message := &aws.Message{}
-	err := proto.Unmarshal(result.Message[sizeOfMessageSize:], message)
+	err := proto.Unmarshal(result.Message[aws.SizeOfMessageSize:], message)
 	return message, err
 }
 
