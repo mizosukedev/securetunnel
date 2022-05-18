@@ -40,7 +40,7 @@ func setupLogger(logLevel string) error {
 
 	logger, err := config.Build()
 	if err != nil {
-		panic("failed to setup logger")
+		return fmt.Errorf("failed to setup logger: %w", err)
 	}
 
 	logLevel = strings.ToLower(logLevel)
