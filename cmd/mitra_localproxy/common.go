@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	logPriorityDebug = 1
-	logPriorityInfo  = 2
-	logPriorityWarn  = 3
-	logPriorityError = 4
+	logPriorityDebug = iota + 1
+	logPriorityInfo
+	logPriorityWarn
+	logPriorityError
 )
 
 var (
@@ -31,22 +31,28 @@ var (
 
 func setupLogger(logLevel string) error {
 
+	logLevel = strings.ToLower(logLevel)
+	priority, ok := logLevelMap[logLevel]
+	if !ok {
+		return fmt.Errorf("invalid log level %s", logLevel)
+	}
+
 	config := zap.NewDevelopmentConfig()
 	config.DisableStacktrace = true
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	config.EncoderConfig.ConsoleSeparator = " "
 	config.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
-	config.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+
+	// For debug level, output the line number of source code.
+	if priority <= logPriorityDebug {
+		config.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+	} else {
+		config.EncoderConfig.EncodeCaller = nil
+	}
 
 	logger, err := config.Build()
 	if err != nil {
-		panic("failed to setup logger")
-	}
-
-	logLevel = strings.ToLower(logLevel)
-	priority, ok := logLevelMap[logLevel]
-	if !ok {
-		return fmt.Errorf("invalid log level %s", logLevel)
+		return fmt.Errorf("failed to setup logger: %w", err)
 	}
 
 	if priority <= logPriorityDebug {
