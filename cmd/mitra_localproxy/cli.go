@@ -40,7 +40,8 @@ Example:
 	usageSourceServices = `environment variable:MITRA_LOCALPROXY_SOURCE_SERVICES
 Start localproxy in source mode and listen for connections on the specified "[address:]port".
 Specify only when starting in source mode.
-When tunneling multiple services, specify the service "service name=[address:]port", separated by commas.
+If you specified destinationConfig.services (multiple services) when running OpenTunnel,
+specify services in the format "service name=[address:]port", separated by commas.
 Example:
   -s 10022
   -s "SSH=10022, RDP=localhost:13389"`
@@ -48,7 +49,8 @@ Example:
 	usageDestinationServices = `environment variable:MITRA_LOCALPROXY_DESTINATION_SERVICES
 Start localproxy in destination mode and connect to the specified "[address:]port".
 Specify only when starting in destination mode.
-When tunneling multiple services, specify the service "name=address:port", separated by commas.
+If you specified destinationConfig.services (multiple services) when running OpenTunnel,
+specify services in the format "service name=[address:]port", separated by commas.
 Example:
   -d 22
   -d "SSH=22, RDP=localhost:3389"`

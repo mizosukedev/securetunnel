@@ -53,11 +53,12 @@
     ``` sh
     $ export MITRA_LOCALPROXY_TOKEN=<set source token>
 
-    # If destinationConfig.services are not specified when executing OpenTunnel
+    # If destinationConfig.services was not specified when running OpenTunnel.
     $ mitra_localproxy -e "wss://data.tunneling.iot.us-east-1.amazonaws.com:443/tunnel" -s 10022
 
-    # If services are specified, specify the service "service name=[address:]port", separated by commas.
-    $ mitra_localproxy -e "wss://data.tunneling.iot.us-east-1.amazonaws.com:443/tunnel" -s "SSH=10022, RDP=13389"
+    # If you specified destinationConfig.services (multiple services) when running OpenTunnel,
+    # specify services in the format "service name=[address:]port", separated by commas.
+    $ mitra_localproxy -e "wss://data.tunneling.iot.us-east-1.amazonaws.com:443/tunnel" -s "SSH=10022, RDP=13389"   
     ```
 
 #### Destination mode
@@ -66,10 +67,11 @@
     ``` sh
     $ export MITRA_LOCALPROXY_TOKEN=<set destination token>
 
-    # If services are not specified when executing OpenTunnel
+    # If destinationConfig.services was not specified when running OpenTunnel.
     $ mitra_localproxy -e wss://data.tunneling.iot.us-east-1.amazonaws.com:443/tunnel -d 22
 
-    # If services are specified, specify the service "service name=[address:]port", separated by commas.
+    # If you specified destinationConfig.services (multiple services) when running OpenTunnel,
+    # specify services in the format "service name=[address:]port", separated by commas.
     $ mitra_localproxy -e wss://data.tunneling.iot.us-east-1.amazonaws.com:443/tunnel -d "SSH=22, RDP=3389"
     ```
 
