@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mizosukedev/securetunnel/client"
+	"github.com/mizosukedev/securetunnel/aws"
 	"github.com/mizosukedev/securetunnel/cmd/common"
 	"github.com/mizosukedev/securetunnel/log"
 	"github.com/mizosukedev/securetunnel/proxy"
@@ -147,7 +147,7 @@ func createProxyOptions(args arguments) (proxy.LocalProxyOptions, error) {
 	}
 
 	if args.sourceServices != "" {
-		options.Mode = client.ModeSource
+		options.Mode = aws.ModeSource
 		options.ServiceConfigs, err = proxy.ParseServiceConfig(args.sourceServices)
 		if err != nil {
 			return options, err
@@ -155,7 +155,7 @@ func createProxyOptions(args arguments) (proxy.LocalProxyOptions, error) {
 	}
 
 	if args.destinationServices != "" {
-		options.Mode = client.ModeDestination
+		options.Mode = aws.ModeDestination
 		options.ServiceConfigs, err = proxy.ParseServiceConfig(args.destinationServices)
 		if err != nil {
 			return options, err

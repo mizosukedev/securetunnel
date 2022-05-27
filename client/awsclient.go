@@ -86,7 +86,7 @@ type AWSClient interface {
 type AWSClientOptions struct {
 
 	// Mode represents local proxy mode.
-	Mode Mode
+	Mode aws.Mode
 
 	// Endpoint represents service endpoint.
 	Endpoint *url.URL
@@ -170,7 +170,7 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 
 // awsClient is a structure that implements AWSClient interface.
 type awsClient struct {
-	mode                  Mode
+	mode                  aws.Mode
 	endpoint              *url.URL
 	token                 string
 	dialTimeout           time.Duration

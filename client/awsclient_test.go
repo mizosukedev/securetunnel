@@ -67,7 +67,7 @@ func (suite *AWSClientTest) TestConnect() {
 	request := <-server.ChRequest
 
 	// check request header
-	suite.Require().Equal(string(ModeDestination), request.FormValue(aws.QueryKeyProxyMode))
+	suite.Require().Equal(string(aws.ModeDestination), request.FormValue(aws.QueryKeyProxyMode))
 	suite.Require().Equal([]string{options.Token}, request.Header["Access-Token"])
 	suite.Require().Equal(aws.SubProtocols, request.Header["Sec-Websocket-Protocol"])
 
@@ -332,7 +332,7 @@ func (suite *AWSClientTest) TestReceivedMessageListenerReturnsError() {
 	request := <-server.ChRequest
 
 	// check request header
-	suite.Require().Equal(string(ModeDestination), request.FormValue(aws.QueryKeyProxyMode))
+	suite.Require().Equal(string(aws.ModeDestination), request.FormValue(aws.QueryKeyProxyMode))
 	suite.Require().Equal([]string{options.Token}, request.Header["Access-Token"])
 	suite.Require().Equal(aws.SubProtocols, request.Header["Sec-Websocket-Protocol"])
 
@@ -600,7 +600,7 @@ func (suite *AWSClientTest) TestSendMessage() {
 func defaultOptions() AWSClientOptions {
 
 	options := AWSClientOptions{
-		Mode:              ModeDestination,
+		Mode:              aws.ModeDestination,
 		Token:             "test_token_string",
 		Endpoint:          nil,
 		TLSConfig:         nil,
