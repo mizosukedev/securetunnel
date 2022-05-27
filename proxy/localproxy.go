@@ -88,7 +88,7 @@ type LocalProxy struct {
 	awsClient        client.AWSClient
 	socketManager    *LocalSocketManager
 	serviceMap       map[string]ServiceConfig // [ServiceID]*ServiceConfig
-	serverMap        map[string]*tcpServer    // [ServiceID]*tcpServer
+	serverMap        map[string]*TcpServer    // [ServiceID]*tcpServer
 }
 
 // NewLocalProxy returns a LocalProxy instance.
@@ -101,14 +101,14 @@ func NewLocalProxy(options LocalProxyOptions) (*LocalProxy, error) {
 
 	// map[ServiceID]
 	serviceMap := map[string]ServiceConfig{}
-	serverMap := map[string]*tcpServer{}
+	serverMap := map[string]*TcpServer{}
 
 	for _, config := range options.ServiceConfigs {
 
 		serviceMap[config.ServiceID] = config
 
 		if options.Mode == client.ModeSource {
-			server, err := newTCPServer(config)
+			server, err := NewTCPServer(config)
 			if err != nil {
 				return nil, err
 			}
