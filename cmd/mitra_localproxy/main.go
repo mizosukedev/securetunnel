@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mizosukedev/securetunnel/client"
+	"github.com/mizosukedev/securetunnel/cmd/common"
 	"github.com/mizosukedev/securetunnel/log"
 	"github.com/mizosukedev/securetunnel/proxy"
 	"github.com/spf13/pflag"
@@ -29,7 +30,7 @@ func main() {
 
 	args := setupCLI()
 
-	err := setupLogger(args.logLevel)
+	err := common.SetupLogger(args.logLevel)
 	exitOnError(err)
 
 	args.dump()
@@ -49,7 +50,7 @@ func main() {
 	defer cancel()
 
 	// signal handler
-	applicationExit(func(signal os.Signal) {
+	common.ApplicationExit(func(signal os.Signal) {
 		log.Infof(
 			"received signal. Please wait up to %d seconds to terminate.",
 			int(terminateWaitTime.Seconds()))
