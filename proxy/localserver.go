@@ -9,9 +9,9 @@ import (
 	"github.com/mizosukedev/securetunnel/log"
 )
 
-// tcpServer is a structure for building TCP server locally.
+// TcpServer is a structure for building TCP server locally.
 // This structure cannot be reused.
-type tcpServer struct {
+type TcpServer struct {
 	config   ServiceConfig
 	listener net.Listener
 	acceptWG *sync.WaitGroup
@@ -20,8 +20,8 @@ type tcpServer struct {
 	started  bool
 }
 
-// newTCPServer returns a tcpServer instance.
-func newTCPServer(config ServiceConfig) (*tcpServer, error) {
+// NewTCPServer returns a tcpServer instance.
+func NewTCPServer(config ServiceConfig) (*TcpServer, error) {
 
 	_, err := net.ResolveUnixAddr(config.Network, config.Address)
 	if err == nil {
@@ -53,7 +53,7 @@ func newTCPServer(config ServiceConfig) (*tcpServer, error) {
 		return nil, err
 	}
 
-	instance := &tcpServer{
+	instance := &TcpServer{
 		config:   config,
 		listener: listener,
 		acceptWG: &sync.WaitGroup{},
@@ -69,7 +69,7 @@ func newTCPServer(config ServiceConfig) (*tcpServer, error) {
 // When the client connects, execute 'handler' function.
 // This method can only be called once.
 // The second and subsequent calls do nothing.
-func (server *tcpServer) Start(handler func(net.Conn)) {
+func (server *TcpServer) Start(handler func(net.Conn)) {
 
 	server.mutex.Lock()
 	if server.started {
@@ -136,7 +136,7 @@ func (server *tcpServer) Start(handler func(net.Conn)) {
 }
 
 // Stop accepting.
-func (server *tcpServer) Stop() {
+func (server *TcpServer) Stop() {
 
 	close(server.chStop)
 

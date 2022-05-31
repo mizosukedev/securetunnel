@@ -18,7 +18,7 @@ import (
 type LocalProxyOptions struct {
 
 	// Mode represents local proxy mode(ModeSource or ModeDestination).
-	Mode client.Mode
+	Mode aws.Mode
 
 	// ServiceConfigs represents the information of the local services to connect to in destination mode,
 	// and represents the information of the local services to listen in source mode.
@@ -50,7 +50,7 @@ type LocalProxyOptions struct {
 func (options LocalProxyOptions) Validate() error {
 
 	switch options.Mode {
-	case client.ModeDestination, client.ModeSource:
+	case aws.ModeDestination, aws.ModeSource:
 	default:
 		err := fmt.Errorf("invalid mode: %v", options.Mode)
 		return err
@@ -83,12 +83,12 @@ func (options LocalProxyOptions) Validate() error {
 
 // LocalProxy represents localproxy in aws secure tunneling service.
 type LocalProxy struct {
-	mode             client.Mode
+	mode             aws.Mode
 	localDialTimeout time.Duration
 	awsClient        client.AWSClient
 	socketManager    *LocalSocketManager
 	serviceMap       map[string]ServiceConfig // [ServiceID]*ServiceConfig
-	serverMap        map[string]*tcpServer    // [ServiceID]*tcpServer
+	serverMap        map[string]*TcpServer    // [ServiceID]*tcpServer
 }
 
 // NewLocalProxy returns a LocalProxy instance.
@@ -101,14 +101,14 @@ func NewLocalProxy(options LocalProxyOptions) (*LocalProxy, error) {
 
 	// map[ServiceID]
 	serviceMap := map[string]ServiceConfig{}
-	serverMap := map[string]*tcpServer{}
+	serverMap := map[string]*TcpServer{}
 
 	for _, config := range options.ServiceConfigs {
 
 		serviceMap[config.ServiceID] = config
 
-		if options.Mode == client.ModeSource {
-			server, err := newTCPServer(config)
+		if options.Mode == aws.ModeSource {
+			server, err := NewTCPServer(config)
 			if err != nil {
 				return nil, err
 			}
@@ -249,7 +249,7 @@ func (listener *eventLisnter) OnData(message *aws.Message) error {
 // OnServiceIDs Refer to AWSMeesageListener.OnServiceIDs
 func (listener *eventLisnter) OnServiceIDs(message *aws.Message) error {
 
-	if listener.localProxy.mode == client.ModeSource {
+	if listener.localProxy.mode == aws.ModeSource {
 
 		for _, server := range listener.localProxy.serverMap {
 

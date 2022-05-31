@@ -52,7 +52,7 @@ func (suite *TCPServerTest) TestNormal() {
 			continue
 		}
 
-		server, err := newTCPServer(config)
+		server, err := NewTCPServer(config)
 		suite.Require().Nil(err)
 		suite.Require().False(server.started)
 
@@ -99,7 +99,7 @@ func (suite *TCPServerTest) TestNewTCPServerSocketFileExists() {
 	err = file.Close()
 	suite.Require().Nil(err)
 
-	server, err := newTCPServer(config)
+	server, err := NewTCPServer(config)
 	suite.Require().Nil(err)
 
 	server.Stop()
@@ -116,7 +116,7 @@ func (suite *TCPServerTest) TestNewTCPServerFailToRemoveSocketFile() {
 
 	config := ServiceConfig{"ssh", "unix", "."}
 
-	_, err := newTCPServer(config)
+	_, err := NewTCPServer(config)
 	suite.Require().NotNil(err)
 }
 
@@ -124,7 +124,7 @@ func (suite *TCPServerTest) TestNewTCPServerFailToRemoveSocketFile() {
 func (suite *TCPServerTest) TestNewTCPServerListenError() {
 
 	config := ServiceConfig{"ssh", "hoge", "127.0.0.1:123456"}
-	_, err := newTCPServer(config)
+	_, err := NewTCPServer(config)
 	suite.Require().NotNil(err)
 }
 
@@ -132,7 +132,7 @@ func (suite *TCPServerTest) TestNewTCPServerListenError() {
 func (suite *TCPServerTest) TestStopCloseError() {
 
 	config := ServiceConfig{"ssh", "tcp", freeAddress}
-	server, err := newTCPServer(config)
+	server, err := NewTCPServer(config)
 	suite.Require().Nil(err)
 
 	server.Start(func(c net.Conn) {})
@@ -156,7 +156,7 @@ func (suite *TCPServerTest) TestStopCloseError() {
 func (suite *TCPServerTest) TestStartExecuteTwice() {
 
 	config := ServiceConfig{"ssh", "tcp", freeAddress}
-	server, err := newTCPServer(config)
+	server, err := NewTCPServer(config)
 	suite.Require().Nil(err)
 
 	suite.Require().False(server.started)

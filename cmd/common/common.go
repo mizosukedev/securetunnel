@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ var (
 	}
 )
 
-func setupLogger(logLevel string) error {
+func SetupLogger(logLevel string) error {
 
 	logLevel = strings.ToLower(logLevel)
 	priority, ok := logLevelMap[logLevel]
@@ -78,7 +78,7 @@ func setupLogger(logLevel string) error {
 	return nil
 }
 
-func applicationExit(handler func(os.Signal)) {
+func ApplicationExit(handler func(os.Signal)) {
 
 	stopSignals := []os.Signal{
 		syscall.SIGTERM,

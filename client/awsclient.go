@@ -86,7 +86,7 @@ type AWSClient interface {
 type AWSClientOptions struct {
 
 	// Mode represents local proxy mode.
-	Mode Mode
+	Mode aws.Mode
 
 	// Endpoint represents service endpoint.
 	Endpoint *url.URL
@@ -170,7 +170,7 @@ func NewAWSClient(options AWSClientOptions) (AWSClient, error) {
 
 // awsClient is a structure that implements AWSClient interface.
 type awsClient struct {
-	mode                  Mode
+	mode                  aws.Mode
 	endpoint              *url.URL
 	token                 string
 	dialTimeout           time.Duration
@@ -219,9 +219,7 @@ func (client *awsClient) Run(ctx context.Context) error {
 			return nil
 		case <-time.After(client.reconnectInterval):
 		}
-
 	}
-
 }
 
 func (client *awsClient) start(ctx context.Context) error {
@@ -360,9 +358,7 @@ func (client *awsClient) keepSendingPing(ctx context.Context) {
 				// continue sending ping
 			}
 		}
-
 	}
-
 }
 
 // keepReadingMessages keep reading message frames,
@@ -393,7 +389,6 @@ func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 					client.invokeEvent(handler, message)
 				}
 			}
-
 		}
 	}
 }
@@ -606,7 +601,6 @@ func (client *awsClient) invokeEvent(
 			client.unknownMessageHandler(message)
 		}
 	}
-
 }
 
 // SendStreamStart Refer to AWSClient.

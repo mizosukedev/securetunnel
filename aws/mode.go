@@ -1,4 +1,4 @@
-package client
+package aws
 
 // Mode represents local proxy mode.
 type Mode string
