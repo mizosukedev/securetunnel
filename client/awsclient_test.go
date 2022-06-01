@@ -24,7 +24,7 @@ func TestAWSClient(t *testing.T) {
 	suite.Run(t, new(AWSClientTest))
 }
 
-// TextConnect confirm the request header when the AWSClient connects.
+// TestConnect confirm the request header when the AWSClient connects.
 func (suite *AWSClientTest) TestConnect() {
 
 	server := testutil.NewSecureTunnelServer()
