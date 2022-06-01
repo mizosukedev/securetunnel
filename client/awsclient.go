@@ -1,11 +1,9 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,7 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/mizosukedev/securetunnel/aws"
 	"github.com/mizosukedev/securetunnel/log"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -365,6 +362,8 @@ func (client *awsClient) keepSendingPing(ctx context.Context) {
 // and fire event handlers associated with AWSClientOptions.MessageListeners.
 func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 
+	messageReader := aws.NewMessageReader(client.con)
+
 	for {
 
 		select {
@@ -374,129 +373,18 @@ func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 
 		default:
 
-			messages, err := client.readMessages()
+			message, err := messageReader.Read()
 			if err != nil {
 				return err
 			}
 
-			for _, message := range messages {
-				// Perhaps Ignorable message can handle localproxy-specific data...?
-				if message.Ignorable {
-					continue
-				}
-
-				for _, handler := range client.messageListeners {
-					client.invokeEvent(handler, message)
-				}
-			}
-		}
-	}
-}
-
-// readMessages read websocket frames, and deserialize.
-func (client *awsClient) readMessages() ([]*aws.Message, error) {
-
-	// A WebSocket frame may contain multiple tunneling frames,
-	// **or it may contain only a slice of a tunneling frame started
-	// in a previous WebSocket frame and will finish in a later WebSocket frame.**
-	// This means that processing the WebSocket data must be done
-	// as pure a sequence of bytes that sequentially construct tunneling frames
-	// regardless of what the WebSocket fragmentation is.
-	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#tunneling-message-frames
-
-	// message -> secure tunnel message(protbuf message)
-	// wsMessage -> websocket message
-
-	prevMessageBin := []byte(nil)
-	restMessageSize := uint16(0)
-	messages := make([]*aws.Message, 0, 1)
-
-	// loop to read websocket frame.
-	for {
-
-		wsMessageType, wsMessage, err := client.con.ReadMessage()
-		if err != nil {
-			return nil, err
-		}
-
-		// This protocol operates entirely with binary messages.
-		// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#websocket-subprotocol-awsiotsecuretunneling-20
-		if wsMessageType != websocket.BinaryMessage {
-			return nil, errors.New("only binary messages can be accepted")
-		}
-
-		reader := bytes.NewReader(wsMessage)
-
-		// loop to deserialize data -> to Message struct
-		for {
-			// |-----------------------------------------------------------------|
-			// | 2-byte data length   |     N byte ProtocolBuffers message       |
-			// |-----------------------------------------------------------------|
-			// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#tunneling-message-frames
-
-			var messageSize uint16
-
-			if restMessageSize == 0 {
-				// message size
-				messageSizeBin := make([]byte, aws.SizeOfMessageSize)
-				_, err := reader.Read(messageSizeBin)
-				if err != nil {
-					err = fmt.Errorf("failed to read message size in websocket frame: %w", err)
-					return nil, err
-				}
-				messageSize = binary.BigEndian.Uint16(messageSizeBin)
-			} else {
-				// Continuation from the previous websocket frame.
-				messageSize = restMessageSize
+			// Perhaps Ignorable message can handle localproxy-specific data...?
+			if message.Ignorable {
+				continue
 			}
 
-			// The entire binary of the message does not exist in this websocket frame.
-			// The next message contains the remaining binaries.
-			if reader.Len() < int(messageSize) {
-				messageBin := make([]byte, reader.Len())
-				readSize, err := reader.Read(messageBin)
-				if err != nil {
-					err = fmt.Errorf("failed to read partial message in websocket frame: %w", err)
-					return nil, err
-				}
-
-				prevMessageBin = append(prevMessageBin, messageBin...)
-				restMessageSize = messageSize - uint16(readSize)
-
-				// next websocket.Conn.ReadMessage()
-				break
-			}
-
-			// The last websocket frame for building a protobuf message.
-
-			// binary protobuf message
-			messageBin := make([]byte, messageSize)
-			_, err = reader.Read(messageBin)
-			if err != nil {
-				err = fmt.Errorf("failed to read message in websocket frame: %w", err)
-				return nil, err
-			}
-
-			if prevMessageBin != nil {
-				messageBin = append(prevMessageBin, messageBin...)
-			}
-
-			prevMessageBin = nil
-			restMessageSize = 0
-
-			// deserialize
-			message := &aws.Message{}
-			err = proto.Unmarshal(messageBin, message)
-			if err != nil {
-				err = fmt.Errorf("invalid protobuf message format: %w", err)
-				return nil, err
-			}
-
-			messages = append(messages, message)
-
-			// EOF
-			if reader.Len() == 0 {
-				return messages, nil
+			for _, handler := range client.messageListeners {
+				client.invokeEvent(handler, message)
 			}
 		}
 	}
@@ -669,19 +557,10 @@ func (client *awsClient) sendMessage(
 		Payload:   data,
 	}
 
-	// serialize message
-	messageBin, err := proto.Marshal(message)
+	messageBin, err := aws.SerializeMessage(message)
 	if err != nil {
-		err = fmt.Errorf("failed to serialize message: %w", err)
 		return err
 	}
-
-	// size
-	sizeBin := make([]byte, aws.SizeOfMessageSize)
-	binary.BigEndian.PutUint16(sizeBin, uint16(len(messageBin)))
-
-	// format message size+message
-	messageBin = append(sizeBin, messageBin...)
 
 	// send
 	err = client.con.WriteMessage(websocket.BinaryMessage, messageBin)
