@@ -249,6 +249,13 @@ func (listener *eventLisnter) OnData(message *aws.Message) error {
 // OnServiceIDs Refer to AWSMeesageListener.OnServiceIDs
 func (listener *eventLisnter) OnServiceIDs(message *aws.Message) error {
 
+	// If the ServiceID is not specified web OpenTunnel is executed,
+	// an empty array will be sent.
+	availableServiceIds := message.AvailableServiceIds
+	if len(availableServiceIds) == 0 {
+		availableServiceIds = []string{""}
+	}
+
 	if listener.localProxy.mode == aws.ModeSource {
 
 		for _, server := range listener.localProxy.serverMap {
@@ -257,7 +264,7 @@ func (listener *eventLisnter) OnServiceIDs(message *aws.Message) error {
 
 			// Check if the service is available.
 			available := false
-			for _, availableServiceID := range message.AvailableServiceIds {
+			for _, availableServiceID := range availableServiceIds {
 				if availableServiceID == serviceID {
 					available = true
 					break
