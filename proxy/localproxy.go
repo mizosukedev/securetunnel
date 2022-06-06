@@ -108,7 +108,7 @@ func NewLocalProxy(options LocalProxyOptions) (*LocalProxy, error) {
 		serviceMap[config.ServiceID] = config
 
 		if options.Mode == aws.ModeSource {
-			server, err := NewTCPServer(config)
+			server, err := NewTCPServer(config.ServiceID, config.Network, config.Address)
 			if err != nil {
 				return nil, err
 			}
@@ -260,7 +260,7 @@ func (listener *eventLisnter) OnServiceIDs(message *aws.Message) error {
 
 		for _, server := range listener.localProxy.serverMap {
 
-			serviceID := server.config.ServiceID
+			serviceID := server.name
 
 			// Check if the service is available.
 			available := false

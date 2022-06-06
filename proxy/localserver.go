@@ -12,7 +12,9 @@ import (
 // TCPServer is a structure for building TCP server locally.
 // This structure cannot be reused.
 type TCPServer struct {
-	config   ServiceConfig
+	name     string
+	network  string
+	address  string
 	listener net.Listener
 	acceptWG *sync.WaitGroup
 	chStop   chan struct{}
@@ -21,20 +23,20 @@ type TCPServer struct {
 }
 
 // NewTCPServer returns a tcpServer instance.
-func NewTCPServer(config ServiceConfig) (*TCPServer, error) {
+func NewTCPServer(name string, network string, address string) (*TCPServer, error) {
 
-	_, err := net.ResolveUnixAddr(config.Network, config.Address)
+	_, err := net.ResolveUnixAddr(network, address)
 	if err == nil {
 
 		// Delete domain socket file that has already existed.
-		_, err = os.Stat(config.Address)
+		_, err = os.Stat(address)
 		if err == nil {
 
-			err := os.Remove(config.Address)
+			err := os.Remove(address)
 			if err != nil {
 				err = fmt.Errorf(
 					"failed to delete domain socket file. Path=%s: %w",
-					config.Address,
+					address,
 					err)
 				return nil, err
 			}
@@ -42,19 +44,20 @@ func NewTCPServer(config ServiceConfig) (*TCPServer, error) {
 		}
 	}
 
-	listener, err := net.Listen(config.Network, config.Address)
+	listener, err := net.Listen(network, address)
 	if err != nil {
 		err = fmt.Errorf(
-			"failed to start tcp server listening. ServiceID=%s Network=%s Address=%s: %w",
-			config.ServiceID,
-			config.Network,
-			config.Address,
+			"failed to start tcp server listening. Network=%s Address=%s: %w",
+			network,
+			address,
 			err)
 		return nil, err
 	}
 
 	instance := &TCPServer{
-		config:   config,
+		name:     name,
+		network:  network,
+		address:  address,
 		listener: listener,
 		acceptWG: &sync.WaitGroup{},
 		chStop:   make(chan struct{}, 1),
@@ -74,10 +77,10 @@ func (server *TCPServer) Start(handler func(net.Conn)) {
 	server.mutex.Lock()
 	if server.started {
 		log.Infof(
-			"tcp server has already started ServiceID=%s Network=%s Address=%s",
-			server.config.ServiceID,
-			server.config.Network,
-			server.config.Address)
+			"tcp server has already started Name=%s Network=%s Address=%s",
+			server.name,
+			server.network,
+			server.address)
 		return
 	}
 	server.started = true
@@ -87,10 +90,10 @@ func (server *TCPServer) Start(handler func(net.Conn)) {
 	//  first call
 
 	log.Infof(
-		"tcp server start accepting. ServiceID=%s Network=%s Address=%s",
-		server.config.ServiceID,
-		server.config.Network,
-		server.config.Address)
+		"tcp server start accepting. Name=%s Network=%s Address=%s",
+		server.name,
+		server.network,
+		server.address)
 
 	server.acceptWG.Add(1)
 
@@ -109,10 +112,10 @@ func (server *TCPServer) Start(handler func(net.Conn)) {
 				con, err := server.listener.Accept()
 				if err != nil {
 					log.Warnf(
-						"tcp server accept error. ServiceID=%s Network=%s Address=%s: %v",
-						server.config.ServiceID,
-						server.config.Network,
-						server.config.Address,
+						"tcp server accept error. Name=%s Network=%s Address=%s: %v",
+						server.name,
+						server.network,
+						server.address,
 						err)
 					continue
 				}
@@ -143,10 +146,10 @@ func (server *TCPServer) Stop() {
 	err := server.listener.Close()
 	if err != nil {
 		err = fmt.Errorf(
-			"close listener error. ServiceID=%s Network=%s Address=%s: %w",
-			server.config.ServiceID,
-			server.config.Network,
-			server.config.Address,
+			"close listener error. Name=%s Network=%s Address=%s: %w",
+			server.name,
+			server.network,
+			server.address,
 			err)
 		log.Error(err)
 	}
@@ -155,8 +158,8 @@ func (server *TCPServer) Stop() {
 	server.acceptWG.Wait()
 
 	log.Infof(
-		"tcp server stopped. ServiceID=%s Network=%s Address=%s",
-		server.config.ServiceID,
-		server.config.Network,
-		server.config.Address)
+		"tcp server stopped. Name=%s Network=%s Address=%s",
+		server.name,
+		server.network,
+		server.address)
 }

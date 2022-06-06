@@ -52,7 +52,7 @@ func (suite *TCPServerTest) TestNormal() {
 			continue
 		}
 
-		server, err := NewTCPServer(config)
+		server, err := NewTCPServer(config.ServiceID, config.Network, config.Address)
 		suite.Require().Nil(err)
 		suite.Require().False(server.started)
 
@@ -91,15 +91,13 @@ func (suite *TCPServerTest) TestNewTCPServerSocketFileExists() {
 		return
 	}
 
-	config := ServiceConfig{"ssh", "unix", socketFilepath}
-
 	file, err := os.Create(socketFilepath)
 	suite.Require().Nil(err)
 
 	err = file.Close()
 	suite.Require().Nil(err)
 
-	server, err := NewTCPServer(config)
+	server, err := NewTCPServer("ssh", "unix", socketFilepath)
 	suite.Require().Nil(err)
 
 	server.Stop()
@@ -114,25 +112,21 @@ func (suite *TCPServerTest) TestNewTCPServerFailToRemoveSocketFile() {
 		return
 	}
 
-	config := ServiceConfig{"ssh", "unix", "."}
-
-	_, err := NewTCPServer(config)
+	_, err := NewTCPServer("ssh", "unix", ".")
 	suite.Require().NotNil(err)
 }
 
 // TestNewTCPServerListenError If net.Listen returns an error, make sure newTCPServer() returns an error.
 func (suite *TCPServerTest) TestNewTCPServerListenError() {
 
-	config := ServiceConfig{"ssh", "hoge", "127.0.0.1:123456"}
-	_, err := NewTCPServer(config)
+	_, err := NewTCPServer("ssh", "hoge", "127.0.0.1:123456")
 	suite.Require().NotNil(err)
 }
 
 // TestStopCloseError confirm that server stop, if net.Listener.Close returns an error.
 func (suite *TCPServerTest) TestStopCloseError() {
 
-	config := ServiceConfig{"ssh", "tcp", freeAddress}
-	server, err := NewTCPServer(config)
+	server, err := NewTCPServer("ssh", "tcp", freeAddress)
 	suite.Require().Nil(err)
 
 	server.Start(func(c net.Conn) {})
@@ -155,8 +149,7 @@ func (suite *TCPServerTest) TestStopCloseError() {
 // if the start method is executed twice.
 func (suite *TCPServerTest) TestStartExecuteTwice() {
 
-	config := ServiceConfig{"ssh", "tcp", freeAddress}
-	server, err := NewTCPServer(config)
+	server, err := NewTCPServer("ssh", "tcp", freeAddress)
 	suite.Require().Nil(err)
 
 	suite.Require().False(server.started)
