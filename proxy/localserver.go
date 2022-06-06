@@ -32,13 +32,13 @@ func NewTCPServer(name string, network string, address string) (*TCPServer, erro
 		_, err = os.Stat(address)
 		if err == nil {
 
-			err := os.Remove(address)
-			if err != nil {
-				err = fmt.Errorf(
+			removeErr := os.Remove(address)
+			if removeErr != nil {
+				removeErr = fmt.Errorf(
 					"failed to delete domain socket file. Path=%s: %w",
 					address,
-					err)
-				return nil, err
+					removeErr)
+				return nil, removeErr
 			}
 
 		}
