@@ -57,7 +57,7 @@ func (options LocalProxyOptions) Validate() error {
 	}
 
 	if options.Endpoint == nil {
-		err := errors.New("Endpoint is nil")
+		err := errors.New("endpoint is nil")
 		return err
 	}
 
@@ -74,7 +74,7 @@ func (options LocalProxyOptions) Validate() error {
 	}
 
 	if options.Token == "" {
-		err := errors.New("Token is empty")
+		err := errors.New("token is empty")
 		return err
 	}
 
