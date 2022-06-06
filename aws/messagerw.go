@@ -55,7 +55,7 @@ func (reader *messageReaderImpl) Read() (*Message, error) {
 	// |-----------------------------------------------------------------|
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#tunneling-message-frames
 
-	err := reader.read(SizeOfMessageSize)
+	err := reader.readAtLeast(SizeOfMessageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (reader *messageReaderImpl) Read() (*Message, error) {
 	endOfMessagePosition := SizeOfMessageSize + reader.messageSize
 
 	// Continue to execute ReadMessage() until the data that deserializes one protobuf message is collected.
-	err = reader.read(endOfMessagePosition)
+	err = reader.readAtLeast(endOfMessagePosition)
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +89,8 @@ func (reader *messageReaderImpl) Read() (*Message, error) {
 	return message, nil
 }
 
-// read data of `leastSize` bytes or more.
-func (reader *messageReaderImpl) read(leastSize uint16) error {
+// readAtLeast read data at least `leastSize` bytes or more.
+func (reader *messageReaderImpl) readAtLeast(leastSize uint16) error {
 
 	for len(reader.messageBin) < int(leastSize) {
 

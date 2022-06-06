@@ -57,7 +57,7 @@ func (options LocalProxyOptions) Validate() error {
 	}
 
 	if options.Endpoint == nil {
-		err := errors.New("Endpoint is nil")
+		err := errors.New("endpoint is nil")
 		return err
 	}
 
@@ -74,7 +74,7 @@ func (options LocalProxyOptions) Validate() error {
 	}
 
 	if options.Token == "" {
-		err := errors.New("Token is empty")
+		err := errors.New("token is empty")
 		return err
 	}
 
@@ -88,7 +88,7 @@ type LocalProxy struct {
 	awsClient        client.AWSClient
 	socketManager    *LocalSocketManager
 	serviceMap       map[string]ServiceConfig // [ServiceID]*ServiceConfig
-	serverMap        map[string]*TcpServer    // [ServiceID]*tcpServer
+	serverMap        map[string]*TCPServer    // [ServiceID]*tcpServer
 }
 
 // NewLocalProxy returns a LocalProxy instance.
@@ -101,14 +101,14 @@ func NewLocalProxy(options LocalProxyOptions) (*LocalProxy, error) {
 
 	// map[ServiceID]
 	serviceMap := map[string]ServiceConfig{}
-	serverMap := map[string]*TcpServer{}
+	serverMap := map[string]*TCPServer{}
 
 	for _, config := range options.ServiceConfigs {
 
 		serviceMap[config.ServiceID] = config
 
 		if options.Mode == aws.ModeSource {
-			server, err := NewTCPServer(config)
+			server, err := NewTCPServer(config.ServiceID, config.Network, config.Address)
 			if err != nil {
 				return nil, err
 			}
@@ -260,7 +260,7 @@ func (listener *eventLisnter) OnServiceIDs(message *aws.Message) error {
 
 		for _, server := range listener.localProxy.serverMap {
 
-			serviceID := server.config.ServiceID
+			serviceID := server.name
 
 			// Check if the service is available.
 			available := false
