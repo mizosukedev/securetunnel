@@ -139,20 +139,6 @@ func (reader *messageReaderImpl) readAtLeast(leastSize uint16) error {
 	return nil
 }
 
-// func (reader *messageReaderImpl) shouldReadMessage() bool {
-
-// 	if reader.messageSize == 0 {
-// 		return true
-// 	} else {
-// 		// Not enough data to read.
-// 		if int(reader.messageSize) < len(reader.messageBin)-SizeOfMessageSize {
-// 			return true
-// 		} else {
-// 			return false
-// 		}
-// 	}
-// }
-
 // SerializeMessage returns serialized binary data.
 func SerializeMessage(message *Message) ([]byte, error) {
 
