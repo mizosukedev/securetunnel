@@ -362,7 +362,8 @@ func (client *awsClient) keepSendingPing(ctx context.Context) {
 // and fire event handlers associated with AWSClientOptions.MessageListeners.
 func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 
-	messageReader := aws.NewMessageReader(client.con)
+	binaryReader := aws.NewBReaderFromWSReader(client.con)
+	messageReader := aws.NewMessageReader(binaryReader)
 
 	for {
 
