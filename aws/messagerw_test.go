@@ -35,7 +35,8 @@ func (suite *MessageRWTest) TestRead() {
 	}
 
 	// test
-	reader := NewMessageReader(websocketReader)
+	binReader := NewBReaderFromWSReader(websocketReader)
+	reader := NewMessageReader(binReader)
 
 	actualMessage, err := reader.Read()
 	suite.Require().Nil(err)
@@ -85,7 +86,8 @@ func (suite *MessageRWTest) TestReadMultipleMessagesInFrame() {
 	}
 
 	// test
-	reader := NewMessageReader(websocketReader)
+	binReader := NewBReaderFromWSReader(websocketReader)
+	reader := NewMessageReader(binReader)
 
 	for _, expectedMessage := range expectedMessages {
 
@@ -139,7 +141,8 @@ func (suite *MessageRWTest) TestReadMessagesInMultipleFrame() {
 	}
 
 	// test
-	reader := NewMessageReader(websocketReader)
+	binReader := NewBReaderFromWSReader(websocketReader)
+	reader := NewMessageReader(binReader)
 
 	for _, expectedMessage := range expectedMessages {
 
@@ -176,7 +179,8 @@ func (suite *MessageRWTest) TestReadTextWebsocketFrame() {
 	}
 
 	// test
-	reader := NewMessageReader(websocketReader)
+	binReader := NewBReaderFromWSReader(websocketReader)
+	reader := NewMessageReader(binReader)
 
 	actualMessage, err := reader.Read()
 	suite.Require().NotNil(err)

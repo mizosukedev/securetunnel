@@ -14,6 +14,7 @@ const (
 )
 
 var (
+	//lint:ignore ST1005 user message use alone.
 	ErrTunnelClosed = errors.New("Tunnel is closed")
 
 	SubProtocols = []string{

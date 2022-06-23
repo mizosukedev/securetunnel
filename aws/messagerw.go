@@ -15,17 +15,51 @@ type MessageReader interface {
 	Read() (*Message, error)
 }
 
+// BinaryReader is an interface for reading binary data.
+type BinaryReader interface {
+	ReadMessage() ([]byte, error)
+}
+
 // WebSocketReader is an interface for reading websocket frames.
 // Actually, it refers to gorilla/websocket.Conn.ReadMessage().
 type WebSocketReader interface {
 	ReadMessage() (messageType int, p []byte, err error)
 }
 
+// NewBReaderFromWSReader returns BinaryReader from WebSocketReader.
+func NewBReaderFromWSReader(wsReader WebSocketReader) BinaryReader {
+
+	instance := &binaryReaderWSAdapter{
+		wsReader: wsReader,
+	}
+
+	return instance
+}
+
+// binaryReaderWSAdapter is an adapter for converting gorilla/websocket.Conn to BinaryReader.
+type binaryReaderWSAdapter struct {
+	wsReader WebSocketReader
+}
+
+// ReadMessage read message from websocket.Conn and return it.
+func (reader *binaryReaderWSAdapter) ReadMessage() ([]byte, error) {
+
+	wsMessageType, wsMessage, err := reader.wsReader.ReadMessage()
+
+	// This protocol operates entirely with binary messages.
+	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#websocket-subprotocol-awsiotsecuretunneling-20
+	if wsMessageType != websocket.BinaryMessage {
+		return nil, errors.New("only binary messages can be accepted")
+	}
+
+	return wsMessage, err
+}
+
 // NewMessageReader returns a instance implements MessageReader interface.
-func NewMessageReader(con WebSocketReader) MessageReader {
+func NewMessageReader(binReader BinaryReader) MessageReader {
 
 	instance := &messageReaderImpl{
-		con:         con,
+		binReader:   binReader,
 		messageSize: 0,
 		messageBin:  nil,
 	}
@@ -34,7 +68,7 @@ func NewMessageReader(con WebSocketReader) MessageReader {
 }
 
 type messageReaderImpl struct {
-	con         WebSocketReader
+	binReader   BinaryReader
 	messageSize uint16
 	messageBin  []byte
 }
@@ -94,36 +128,16 @@ func (reader *messageReaderImpl) readAtLeast(leastSize uint16) error {
 
 	for len(reader.messageBin) < int(leastSize) {
 
-		wsMessageType, wsMessage, err := reader.con.ReadMessage()
+		binMessage, err := reader.binReader.ReadMessage()
 		if err != nil {
 			return fmt.Errorf("failed to read websocket message: %w", err)
 		}
 
-		// This protocol operates entirely with binary messages.
-		// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#websocket-subprotocol-awsiotsecuretunneling-20
-		if wsMessageType != websocket.BinaryMessage {
-			return errors.New("only binary messages can be accepted")
-		}
-
-		reader.messageBin = append(reader.messageBin, wsMessage...)
+		reader.messageBin = append(reader.messageBin, binMessage...)
 	}
 
 	return nil
 }
-
-// func (reader *messageReaderImpl) shouldReadMessage() bool {
-
-// 	if reader.messageSize == 0 {
-// 		return true
-// 	} else {
-// 		// Not enough data to read.
-// 		if int(reader.messageSize) < len(reader.messageBin)-SizeOfMessageSize {
-// 			return true
-// 		} else {
-// 			return false
-// 		}
-// 	}
-// }
 
 // SerializeMessage returns serialized binary data.
 func SerializeMessage(message *Message) ([]byte, error) {
