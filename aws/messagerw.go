@@ -46,13 +46,19 @@ func (reader *binaryReaderWSAdapter) ReadMessage() ([]byte, error) {
 
 	wsMessageType, wsMessage, err := reader.wsReader.ReadMessage()
 
+	// if ReadMessage() returns an error, the value of wsMessageType is 0.
+	// So check for error first.
+	if err != nil {
+		return nil, err
+	}
+
 	// This protocol operates entirely with binary messages.
 	// 	See: https://github.com/aws-samples/aws-iot-securetunneling-localproxy/blob/v2.1.0/V2WebSocketProtocolGuide.md#websocket-subprotocol-awsiotsecuretunneling-20
 	if wsMessageType != websocket.BinaryMessage {
 		return nil, errors.New("only binary messages can be accepted")
 	}
 
-	return wsMessage, err
+	return wsMessage, nil
 }
 
 // NewMessageReader returns a instance implements MessageReader interface.
