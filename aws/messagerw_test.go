@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -185,4 +186,29 @@ func (suite *MessageRWTest) TestReadTextWebsocketFrame() {
 	actualMessage, err := reader.Read()
 	suite.Require().NotNil(err)
 	suite.Require().Nil(actualMessage)
+}
+
+// TestReadMessageReturnsError If ReadMessage returns an error,
+// make sure MessageReader returns the appropriate error.
+func (suite *MessageRWTest) TestReadMessageReturnsError() {
+
+	// create test data
+	message := &Message{}
+
+	messageBin, err := SerializeMessage(message)
+	suite.Require().Nil(err)
+
+	expectedErr := errors.New("test error")
+	websocketReader := NewMockWebSocketReader()
+	websocketReader.MockRead = func() (messageType int, p []byte, err error) {
+		// if ReadMessage returns an error, messageType is 0.
+		return 0, messageBin, expectedErr
+	}
+
+	// test
+	binReader := NewBReaderFromWSReader(websocketReader)
+	reader := NewMessageReader(binReader)
+
+	_, err = reader.Read()
+	suite.Require().ErrorIs(err, expectedErr)
 }
