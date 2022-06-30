@@ -75,6 +75,7 @@ func NewTCPServer(name string, network string, address string) (*TCPServer, erro
 func (server *TCPServer) Start(handler func(net.Conn)) {
 
 	server.mutex.Lock()
+	defer server.mutex.Unlock()
 	if server.started {
 		log.Infof(
 			"tcp server has already started Name=%s Network=%s Address=%s",
@@ -84,7 +85,6 @@ func (server *TCPServer) Start(handler func(net.Conn)) {
 		return
 	}
 	server.started = true
-	server.mutex.Unlock()
 
 	// -----------------
 	//  first call

@@ -155,7 +155,11 @@ func (suite *TCPServerTest) TestStartExecuteTwice() {
 	suite.Require().False(server.started)
 	server.Start(func(c net.Conn) {})
 	suite.Require().True(server.started)
-	server.Start(func(c net.Conn) {})
+
+	restartCount := 5
+	for i := 0; i < restartCount; i++ {
+		server.Start(func(c net.Conn) {})
+	}
 
 	server.Stop()
 }
