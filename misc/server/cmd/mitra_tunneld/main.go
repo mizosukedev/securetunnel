@@ -13,13 +13,13 @@ import (
 
 var (
 	// TODO:command line arguments
-	needAuth  = false
-	address   = "0.0.0.0:18080"
+	needAuth          = false
+	address           = "0.0.0.0:18080"
 	tunnelIDDigit     = uint(3)
 	tokenDigit        = uint(3)
 	connectionIDDigit = uint(3)
-	logLevel  = "debug"
-	debugMode = true
+	logLevel          = "debug"
+	debugMode         = true
 )
 
 func main() {
@@ -85,7 +85,7 @@ func main() {
 		tunnelGroup := needAuthGroup.Group("/tunnel")
 		{
 			tunnelGroup.POST("/open", server.PreProcess(svc.OpenTunnel))
-			tunnelGroup.GET("/list")
+			tunnelGroup.GET("/list", server.PreProcess(svc.ListTunnels))
 			tunnelGroup.GET("/describe")
 			tunnelGroup.PUT("/close")
 		}
