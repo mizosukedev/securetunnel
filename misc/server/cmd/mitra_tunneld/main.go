@@ -32,10 +32,14 @@ func main() {
 	// -------------------------------
 
 	var authorizer server.Authorizer
+	var store server.Store
+	var notifier server.Notifier
 
 	authorizer = &server.NilAuthorizer{}
+	store = &server.MemoryStore{}
+	notifier = &server.NilNotifier{}
 
-	pluggables := []server.Pluggable{authorizer}
+	pluggables := []server.Pluggable{authorizer, store, notifier}
 	for _, pluggable := range pluggables {
 		err := pluggable.Init()
 		if err != nil {
@@ -53,6 +57,8 @@ func main() {
 	svc := &server.Services{
 		NeedAuth: needAuth,
 		Auth:     authorizer,
+		Store:    store,
+		Notifier: notifier,
 	}
 
 	err = svc.Start()
