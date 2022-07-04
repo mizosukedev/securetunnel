@@ -49,10 +49,11 @@ func PreProcess[T any](handler func(*gin.Context, T)) gin.HandlerFunc {
 }
 
 type Services struct {
-	NeedAuth bool
-	Auth     Authorizer
-	Store    Store
-	Notifier Notifier
+	IDTokenGen *IDTokenGen
+	NeedAuth   bool
+	Auth       Authorizer
+	Store      Store
+	Notifier   Notifier
 }
 
 func (svc *Services) Start() error {

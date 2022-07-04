@@ -15,6 +15,9 @@ var (
 	// TODO:command line arguments
 	needAuth  = false
 	address   = "0.0.0.0:18080"
+	tunnelIDDigit     = uint(3)
+	tokenDigit        = uint(3)
+	connectionIDDigit = uint(3)
 	logLevel  = "debug"
 	debugMode = true
 )
@@ -55,6 +58,11 @@ func main() {
 	engine := gin.Default()
 
 	svc := &server.Services{
+		IDTokenGen: &server.IDTokenGen{
+			TunnelIDDigit:     tunnelIDDigit,
+			TokenDigit:        tokenDigit,
+			ConnectionIDDigit: connectionIDDigit,
+		},
 		NeedAuth: needAuth,
 		Auth:     authorizer,
 		Store:    store,
@@ -76,7 +84,7 @@ func main() {
 
 		tunnelGroup := needAuthGroup.Group("/tunnel")
 		{
-			tunnelGroup.POST("/open")
+			tunnelGroup.POST("/open", server.PreProcess(svc.OpenTunnel))
 			tunnelGroup.GET("/list")
 			tunnelGroup.GET("/describe")
 			tunnelGroup.PUT("/close")
