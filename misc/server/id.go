@@ -19,6 +19,14 @@ func (token AccessToken) TunnelID() string {
 	return parts[0]
 }
 
+// ConnectionID = {tunnelID}_{random string}
+type ConnectionID string
+
+func (connectionID ConnectionID) TunnelID() string {
+	parts := strings.Split(string(connectionID), separator)
+	return parts[0]
+}
+
 type IDTokenGen struct {
 	TunnelIDDigit     uint
 	TokenDigit        uint
@@ -91,4 +99,16 @@ func (idTokenGen *IDTokenGen) NewIDTokens() (IDTokens, error) {
 	}
 
 	return ids, nil
+}
+
+func (idTokenGen *IDTokenGen) NewConnectionID(tunnelID string) (ConnectionID, error) {
+
+	id, err := idTokenGen.GenerateID(idTokenGen.ConnectionIDDigit)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("%s%s%s", tunnelID, separator, id)
+
+	return ConnectionID(result), nil
 }
