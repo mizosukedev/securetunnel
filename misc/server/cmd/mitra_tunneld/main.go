@@ -87,7 +87,7 @@ func main() {
 			tunnelGroup.POST("/open", server.PreProcess(svc.OpenTunnel))
 			tunnelGroup.GET("/list", server.PreProcess(svc.ListTunnels))
 			tunnelGroup.GET("/describe", server.PreProcess(svc.DescribeTunnel))
-			tunnelGroup.PUT("/close")
+			tunnelGroup.PUT("/close", server.PreProcess(svc.CloseTunnel))
 		}
 
 		if debugMode {
