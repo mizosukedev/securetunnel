@@ -11,8 +11,8 @@ type Authorizer interface {
 	Login(http.ResponseWriter, *http.Request)
 	// Logout the server.
 	Logout(http.ResponseWriter, *http.Request)
-	// HasAuth Check if you have the credentials and make sure that the credentials are authorized
-	// to access the resource.
+	// HasAuth Check if the request has the credentials and make sure that
+	// the credentials are authorized to access the resource.
 	HasAuth(*http.Request) error
 }
 

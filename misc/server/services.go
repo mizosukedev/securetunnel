@@ -1,16 +1,11 @@
 package server
 
-import "github.com/gin-gonic/gin"
-
 type Services struct {
+	NeedAuth bool
+	Auth     Authorizer
 }
 
-func (svc *Services) Init() error {
+func (svc *Services) Start() error {
 
 	return nil
-}
-
-func (svc *Services) Login(*gin.Context) {
-}
-func (svc *Services) Logout(*gin.Context) {
 }
