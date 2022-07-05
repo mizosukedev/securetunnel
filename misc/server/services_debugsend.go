@@ -25,7 +25,7 @@ func (request DebugSendRequest) Validate() error {
 // DebugSendToPeer send message to localproxy.
 // You can interrupt and send a message to a specific peer.
 // Example:
-// 	curl -s http://localhost:18080/debug/tunnel/send
+// 	curl -s -X POST -d 'tunnelId=<tunnelID>' -d 'mode=source' -d 'type=4' http://localhost:18080/debug/tunnel/send
 func (svc *Services) DebugSendToPeer(ctx *gin.Context, args DebugSendRequest) {
 
 	message := &aws.Message{
