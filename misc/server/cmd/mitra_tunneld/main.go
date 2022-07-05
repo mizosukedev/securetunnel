@@ -98,7 +98,7 @@ func main() {
 		if debugMode {
 			debugGroup := needAuthGroup.Group("/debug")
 			{
-				debugGroup.GET("/tunnel/list")
+				debugGroup.GET("/tunnel/list", server.PreProcess(svc.DebugListTunnels))
 				debugGroup.POST("/tunnel/send")
 			}
 		}
