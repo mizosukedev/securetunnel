@@ -12,9 +12,10 @@ import (
 )
 
 type TunnelConnectArgs struct {
-	Mode        aws.Mode    `form:"local-proxy-mode"`
-	AccessToken AccessToken `header:"access-token"`
-	ClientToken string      `header:"client-token"`
+	Mode         aws.Mode    `form:"local-proxy-mode"`
+	Subprotocols []string    `header:"Sec-WebSocket-Protocol"`
+	AccessToken  AccessToken `header:"access-token"`
+	ClientToken  string      `header:"client-token"`
 }
 
 func (request TunnelConnectArgs) Validate() error {
@@ -23,6 +24,18 @@ func (request TunnelConnectArgs) Validate() error {
 	case aws.ModeDestination, aws.ModeSource:
 	default:
 		return fmt.Errorf("invalid mode '%s'", request.Mode)
+	}
+
+	// Only V2 protocol is supported.
+	validProtocol := false
+	for i := 0; i < len(request.Subprotocols); i++ {
+		if request.Subprotocols[i] == aws.SubProtocolV2 {
+			validProtocol = true
+		}
+	}
+
+	if !validProtocol {
+		return fmt.Errorf("invalid subprotocol. only %s is supported", aws.SubProtocolV2)
 	}
 
 	return nil
@@ -152,7 +165,6 @@ func (svc *Services) TunnelConnect(ctx *gin.Context, args TunnelConnectArgs) {
 	// --------------------------------------------
 
 	upgrader := websocket.Upgrader{}
-	// Only V2 protocol is supported.
 	upgrader.Subprotocols = []string{aws.SubProtocolV2}
 
 	wsCon, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
@@ -171,6 +183,9 @@ func (svc *Services) TunnelConnect(ctx *gin.Context, args TunnelConnectArgs) {
 	//  No header can be returned after this line.
 	//  The error is returned with close code.
 	// --------------------------------------------
+
+	// selected subprotocol
+	// switch wsCon.Subprotocol(){}
 
 	err = svc.peerConManager.connect(tunnelID, args.Mode, wsCon, tunnel.Services)
 	if err != nil {
