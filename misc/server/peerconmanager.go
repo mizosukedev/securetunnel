@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -78,6 +79,27 @@ func (manager *peerConManager) connect(
 	}
 
 	return err
+}
+
+func (manager *peerConManager) sendToPeer(
+	tunnelID string,
+	mode aws.Mode,
+	message *aws.Message) error {
+
+	peerKey := peerConnectionKey{
+		tunnelID: tunnelID,
+		mode:     mode,
+	}
+
+	peerConnection, ok := manager.peerConMap[peerKey]
+	if !ok {
+		err := fmt.Errorf("peer not found: TunnelID=%s Mode=%v", tunnelID, mode)
+		return err
+	}
+
+	peerConnection.asyncWrite(message)
+
+	return nil
 }
 
 func (manager *peerConManager) closeExpiredConnection() {

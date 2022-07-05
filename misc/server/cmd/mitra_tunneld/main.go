@@ -99,7 +99,7 @@ func main() {
 			debugGroup := needAuthGroup.Group("/debug")
 			{
 				debugGroup.GET("/tunnel/list", server.PreProcess(svc.DebugListTunnels))
-				debugGroup.POST("/tunnel/send")
+				debugGroup.POST("/tunnel/send", server.PreProcess(svc.DebugSendToPeer))
 			}
 		}
 	}
