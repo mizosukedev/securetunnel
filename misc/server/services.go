@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -69,6 +70,14 @@ func (svc *Services) Start() error {
 		store:      svc.Store,
 		peerConMap: map[peerConnectionKey]*peerConnection{},
 	}
+
+	// Periodically disconnect the localproxy connecting to the closed tunnel.
+	go func() {
+		for {
+			<-time.After(time.Minute)
+			svc.peerConManager.closeExpiredConnection()
+		}
+	}()
 
 	return nil
 }

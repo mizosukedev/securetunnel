@@ -79,3 +79,37 @@ func (manager *peerConManager) connect(
 
 	return err
 }
+
+func (manager *peerConManager) closeExpiredConnection() {
+
+	manager.rwMutex.RLock()
+	defer manager.rwMutex.RUnlock()
+
+	connectionsMap := map[string][]*peerConnection{}
+
+	for key, peerCon := range manager.peerConMap {
+		connections := connectionsMap[key.tunnelID]
+		connections = append(connections, peerCon)
+		connectionsMap[key.tunnelID] = connections
+	}
+
+	for tunnelID, connections := range connectionsMap {
+
+		tunnel, err := manager.store.GetTunnel(tunnelID)
+		if err != nil {
+			log.Error(err)
+		}
+
+		if !tunnel.Open() {
+			for _, connection := range connections {
+				err := connection.close(
+					websocket.CloseNormalClosure,
+					aws.StatusReasonTunnelClosed)
+
+				if err != nil {
+					log.Error(err)
+				}
+			}
+		}
+	}
+}
