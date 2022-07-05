@@ -20,6 +20,9 @@ var (
 	connectionIDDigit = uint(3)
 	logLevel          = "debug"
 	debugMode         = true
+	// TODO:multiple server
+	interServerNetwork = "tcp"
+	interServerAddress = "0.0.0.0:18081"
 )
 
 func main() {
@@ -63,10 +66,12 @@ func main() {
 			TokenDigit:        tokenDigit,
 			ConnectionIDDigit: connectionIDDigit,
 		},
-		NeedAuth: needAuth,
-		Auth:     authorizer,
-		Store:    store,
-		Notifier: notifier,
+		NeedAuth:           needAuth,
+		InterServerNetwork: interServerNetwork,
+		InterServerAddress: interServerAddress,
+		Auth:               authorizer,
+		Store:              store,
+		Notifier:           notifier,
 	}
 
 	err = svc.Start()

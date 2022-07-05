@@ -97,12 +97,14 @@ func (svc *Services) TunnelConnect(ctx *gin.Context, args TunnelConnectArgs) {
 
 	// Add connection
 	connection := Connection{
-		ID:            connectionID,
-		Rev:           1,
-		TunnelID:      tunnelID,
-		Mode:          args.Mode,
-		Status:        ConnStatusConnected,
-		LastUpdatedAt: now,
+		ID:                 connectionID,
+		Rev:                1,
+		TunnelID:           tunnelID,
+		Mode:               args.Mode,
+		Status:             ConnStatusConnected,
+		InterServerNetwork: svc.InterServerNetwork,
+		InterServerAddress: svc.InterServerAddress,
+		LastUpdatedAt:      now,
 	}
 
 	err = svc.Store.AddConnection(connection)

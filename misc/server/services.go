@@ -50,15 +50,19 @@ func PreProcess[T any](handler func(*gin.Context, T)) gin.HandlerFunc {
 }
 
 type Services struct {
-	IDTokenGen     *IDTokenGen
-	NeedAuth       bool
-	Auth           Authorizer
-	Store          Store
-	Notifier       Notifier
-	peerConManager *peerConManager
+	IDTokenGen         *IDTokenGen
+	NeedAuth           bool
+	InterServerNetwork string
+	InterServerAddress string
+	Auth               Authorizer
+	Store              Store
+	Notifier           Notifier
+	peerConManager     *peerConManager
 }
 
 func (svc *Services) Start() error {
+
+	// TODO: start GRPC inter server
 
 	svc.peerConManager = &peerConManager{
 		rwMutex:    &sync.RWMutex{},
