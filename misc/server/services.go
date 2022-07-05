@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,14 +50,21 @@ func PreProcess[T any](handler func(*gin.Context, T)) gin.HandlerFunc {
 }
 
 type Services struct {
-	IDTokenGen *IDTokenGen
-	NeedAuth   bool
-	Auth       Authorizer
-	Store      Store
-	Notifier   Notifier
+	IDTokenGen     *IDTokenGen
+	NeedAuth       bool
+	Auth           Authorizer
+	Store          Store
+	Notifier       Notifier
+	peerConManager *peerConManager
 }
 
 func (svc *Services) Start() error {
+
+	svc.peerConManager = &peerConManager{
+		rwMutex:    &sync.RWMutex{},
+		store:      svc.Store,
+		peerConMap: map[peerConnectionKey]*peerConnection{},
+	}
 
 	return nil
 }

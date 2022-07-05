@@ -48,6 +48,29 @@ func (tunnel Tunnel) SetRev(rev uint) {
 	tunnel.Rev = rev
 }
 
+func (tunnel Tunnel) Peer(mode aws.Mode) *Peer {
+
+	switch mode {
+	case aws.ModeDestination:
+		return tunnel.DestinationPeer
+	case aws.ModeSource:
+		return tunnel.SourcePeer
+	default:
+		return nil
+	}
+}
+
+func (tunnel Tunnel) Token(mode aws.Mode) AccessToken {
+
+	switch mode {
+	case aws.ModeDestination:
+		return tunnel.DestinationToken
+	case aws.ModeSource:
+		return tunnel.SourceToken
+	default:
+		return AccessToken("")
+	}
+}
 func (tunnel Tunnel) Open() bool {
 
 	result := tunnel.Status() == TunnelStatusOpen

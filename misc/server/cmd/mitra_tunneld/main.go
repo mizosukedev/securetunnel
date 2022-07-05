@@ -99,7 +99,7 @@ func main() {
 		}
 	}
 
-	engine.GET("/tunnel/connect")
+	engine.GET("/tunnel/connect", server.PreProcess(svc.TunnelConnect))
 
 	// -----
 	//  Run
