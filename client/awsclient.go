@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -604,15 +605,24 @@ type connectError struct {
 func (conErr *connectError) Error() string {
 
 	var responseHeader http.Header
+	var responseBody []byte
 	if conErr.response != nil {
 		responseHeader = conErr.response.Header
+
+		if conErr.response.Body != nil {
+			body, err := ioutil.ReadAll(conErr.response.Body)
+			if err == nil {
+				responseBody = body
+			}
+		}
 	}
 
 	message := fmt.Sprintf(
-		"failed to connect to ->%v header=%v cause=%v",
+		"failed to connect to ->%v header=%v cause=%v body=%s",
 		conErr.url,
 		responseHeader,
-		conErr.causeErr)
+		conErr.causeErr,
+		responseBody)
 
 	return message
 }

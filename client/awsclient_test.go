@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -130,7 +132,6 @@ func (suite *AWSClientTest) TestReconnect() {
 
 			if test.wantRunErr {
 				suite.Require().NotNil(err)
-				fmt.Println(err)
 			} else {
 				suite.Require().Nil(err)
 			}
@@ -595,6 +596,48 @@ func (suite *AWSClientTest) TestSendMessage() {
 
 	suite.Require().Equal(streamID, message.StreamId)
 	suite.Require().Equal(serviceID, message.ServiceId)
+}
+
+func (suite *AWSClientTest) TestConnectError() {
+
+	strUrl := "ws://localhost:443/tunnel"
+	defaultURL, err := url.Parse(strUrl)
+	suite.Require().Nil(err)
+
+	type args struct {
+		url      *url.URL
+		response *http.Response
+		causeErr error
+	}
+
+	tests := []struct {
+		name         string
+		args         args
+		expectedMsgs []string
+	}{
+		// Add test cases.
+		{"all set", args{defaultURL, &http.Response{Body: io.NopCloser(strings.NewReader("body msg"))}, errors.New("cause msg")}, []string{strUrl, "body msg", "cause msg"}},
+		{"url nil", args{nil, &http.Response{Body: io.NopCloser(strings.NewReader("body msg"))}, errors.New("cause msg")}, []string{"body msg", "cause msg"}},
+		{"response nil", args{defaultURL, nil, errors.New("cause msg")}, []string{strUrl, "cause msg"}},
+		{"response.Body nil", args{defaultURL, &http.Response{Body: nil}, errors.New("cause msg")}, []string{strUrl, "cause msg"}},
+		{"cause nil", args{defaultURL, &http.Response{Body: io.NopCloser(strings.NewReader("body msg"))}, nil}, []string{strUrl, "body msg"}},
+	}
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+
+			connectError := &connectError{
+				url:      tt.args.url,
+				response: tt.args.response,
+				causeErr: tt.args.causeErr,
+			}
+
+			errMsg := connectError.Error()
+
+			for _, msg := range tt.expectedMsgs {
+				suite.Require().Contains(errMsg, msg)
+			}
+		})
+	}
 }
 
 func defaultOptions() AWSClientOptions {
