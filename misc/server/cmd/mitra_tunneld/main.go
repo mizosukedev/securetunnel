@@ -104,7 +104,9 @@ func main() {
 		}
 	}
 
-	engine.GET("/tunnel/connect", server.PreProcess(svc.TunnelConnect))
+	// Since the local proxy made by AWS cannot change the path part,
+	// match the path with the AWS service.
+	engine.GET("/tunnel", server.PreProcess(svc.TunnelConnect))
 
 	// -----
 	//  Run
