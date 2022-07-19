@@ -106,32 +106,31 @@ func (server *TCPServer) Start(handler func(net.Conn)) {
 			select {
 			case <-server.chStop:
 				return
-
 			default:
+			}
 
-				con, err := server.listener.Accept()
-				if err != nil {
-					log.Warnf(
-						"tcp server accept error. Name=%s Network=%s Address=%s: %v",
-						server.name,
-						server.network,
-						server.address,
-						err)
-					continue
+			con, err := server.listener.Accept()
+			if err != nil {
+				log.Warnf(
+					"tcp server accept error. Name=%s Network=%s Address=%s: %v",
+					server.name,
+					server.network,
+					server.address,
+					err)
+				continue
+			}
+
+			server.acceptWG.Add(1)
+			go func() {
+
+				defer server.acceptWG.Done()
+
+				if handler != nil {
+					handler(con)
 				}
 
-				server.acceptWG.Add(1)
-				go func() {
+			}()
 
-					defer server.acceptWG.Done()
-
-					if handler != nil {
-						handler(con)
-					}
-
-				}()
-
-			}
 		}
 
 	}()

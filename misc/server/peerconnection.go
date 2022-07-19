@@ -136,23 +136,22 @@ func (peerCon *peerConnection) startReadingMessage(ctx context.Context) error {
 	for {
 
 		select {
-
 		case <-ctx.Done():
 			return nil
-
 		default:
-
-			for {
-				message, err := reader.Read()
-				if err != nil {
-					return err
-				}
-
-				// TODO: validate message? serviceID exists...etc
-
-				peerCon.writeToAssociated(message)
-			}
 		}
+
+		for {
+			message, err := reader.Read()
+			if err != nil {
+				return err
+			}
+
+			// TODO: validate message? serviceID exists...etc
+
+			peerCon.writeToAssociated(message)
+		}
+
 	}
 }
 
