@@ -146,6 +146,7 @@ func (suite *AWSClientTest) TestReconnect() {
 			<-chClientTerminate
 		} else {
 			<-chClientTerminate
+			suite.Require().Len(server.ChRequest, 1) // first connection only
 		}
 
 		cancel()
