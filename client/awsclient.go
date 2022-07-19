@@ -369,25 +369,23 @@ func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 	for {
 
 		select {
-
 		case <-ctx.Done():
 			return ctx.Err()
-
 		default:
+		}
 
-			message, err := messageReader.Read()
-			if err != nil {
-				return err
-			}
+		message, err := messageReader.Read()
+		if err != nil {
+			return err
+		}
 
-			// Perhaps Ignorable message can handle localproxy-specific data...?
-			if message.Ignorable {
-				continue
-			}
+		// Perhaps Ignorable message can handle localproxy-specific data...?
+		if message.Ignorable {
+			continue
+		}
 
-			for _, handler := range client.messageListeners {
-				client.invokeEvent(handler, message)
-			}
+		for _, handler := range client.messageListeners {
+			client.invokeEvent(handler, message)
 		}
 	}
 }
