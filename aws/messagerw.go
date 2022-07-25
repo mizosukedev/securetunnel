@@ -9,15 +9,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// MessageReader is an interface for reading secure tunneling messages.
+// MessageReader is an interface for reading messages in secure tunneling service.
 type MessageReader interface {
-	// Read websocket frames, and return deserialized Message.
-	Read() (*Message, error)
+	// Next reads websocket frames, and returns next deserialized Message.
+	Next() (*Message, error)
 }
 
 // BinaryReader is an interface for reading binary data.
 type BinaryReader interface {
-	ReadMessage() ([]byte, error)
+	Read() ([]byte, error)
 }
 
 // WebSocketReader is an interface for reading websocket frames.
@@ -41,8 +41,8 @@ type binaryReaderWSAdapter struct {
 	wsReader WebSocketReader
 }
 
-// ReadMessage read message from websocket.Conn and return it.
-func (reader *binaryReaderWSAdapter) ReadMessage() ([]byte, error) {
+// Read message from websocket.Conn and return it.
+func (reader *binaryReaderWSAdapter) Read() ([]byte, error) {
 
 	wsMessageType, wsMessage, err := reader.wsReader.ReadMessage()
 
@@ -79,8 +79,10 @@ type messageReaderImpl struct {
 	messageBin  []byte
 }
 
-// Read websocket frames, and return deserialized Message.
-func (reader *messageReaderImpl) Read() (*Message, error) {
+// Next reads websocket frames, and returns next deserialized Message.
+// If the data read from the BinaryReader remains after returning the Message,
+// that data will be stored internally until the next method call.
+func (reader *messageReaderImpl) Next() (*Message, error) {
 
 	// A WebSocket frame may contain multiple tunneling frames,
 	// **or it may contain only a slice of a tunneling frame started
@@ -134,7 +136,7 @@ func (reader *messageReaderImpl) readAtLeast(leastSize uint16) error {
 
 	for len(reader.messageBin) < int(leastSize) {
 
-		binMessage, err := reader.binReader.ReadMessage()
+		binMessage, err := reader.binReader.Read()
 		if err != nil {
 			return fmt.Errorf("failed to read websocket message: %w", err)
 		}

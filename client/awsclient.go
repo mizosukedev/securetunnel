@@ -374,7 +374,7 @@ func (client *awsClient) keepReadingMessages(ctx context.Context) error {
 		default:
 		}
 
-		message, err := messageReader.Read()
+		message, err := messageReader.Next()
 		if err != nil {
 			return err
 		}

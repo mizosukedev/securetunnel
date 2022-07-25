@@ -142,7 +142,7 @@ func (peerCon *peerConnection) startReadingMessage(ctx context.Context) error {
 		}
 
 		for {
-			message, err := reader.Read()
+			message, err := reader.Next()
 			if err != nil {
 				return err
 			}
