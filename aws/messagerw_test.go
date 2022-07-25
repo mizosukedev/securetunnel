@@ -16,8 +16,8 @@ func TestMessageRW(t *testing.T) {
 	suite.Run(t, new(MessageRWTest))
 }
 
-// TestRead confirm the operation when Worker is used normally.
-func (suite *MessageRWTest) TestRead() {
+// TestNext confirm the operation when Worker is used normally.
+func (suite *MessageRWTest) TestNext() {
 
 	// create test data
 	expectedMessage := &Message{
@@ -39,7 +39,7 @@ func (suite *MessageRWTest) TestRead() {
 	binReader := NewBReaderFromWSReader(websocketReader)
 	reader := NewMessageReader(binReader)
 
-	actualMessage, err := reader.Read()
+	actualMessage, err := reader.Next()
 	suite.Require().Nil(err)
 
 	// assert
@@ -49,8 +49,8 @@ func (suite *MessageRWTest) TestRead() {
 	suite.Require().Equal(expectedMessage.Payload, actualMessage.Payload)
 }
 
-// TestReadMultipleMessagesInFrame multiple messages in a websocket frame
-func (suite *MessageRWTest) TestReadMultipleMessagesInFrame() {
+// TestNextMultipleMessagesInFrame multiple messages in a websocket frame
+func (suite *MessageRWTest) TestNextMultipleMessagesInFrame() {
 
 	// create data
 	expectedMessages := []*Message{
@@ -92,7 +92,7 @@ func (suite *MessageRWTest) TestReadMultipleMessagesInFrame() {
 
 	for _, expectedMessage := range expectedMessages {
 
-		actualMessage, err := reader.Read()
+		actualMessage, err := reader.Next()
 		suite.Require().Nil(err)
 
 		// assert
@@ -104,8 +104,8 @@ func (suite *MessageRWTest) TestReadMultipleMessagesInFrame() {
 	}
 }
 
-// TestReadMessagesInMultipleFrame messages in multiple websocket frames.
-func (suite *MessageRWTest) TestReadMessagesInMultipleFrame() {
+// TestNextMessagesInMultipleFrame messages in multiple websocket frames.
+func (suite *MessageRWTest) TestNextMessagesInMultipleFrame() {
 
 	// create data
 	expectedMessages := []*Message{
@@ -147,7 +147,7 @@ func (suite *MessageRWTest) TestReadMessagesInMultipleFrame() {
 
 	for _, expectedMessage := range expectedMessages {
 
-		actualMessage, err := reader.Read()
+		actualMessage, err := reader.Next()
 		suite.Require().Nil(err)
 
 		// assert
@@ -159,8 +159,8 @@ func (suite *MessageRWTest) TestReadMessagesInMultipleFrame() {
 	}
 }
 
-// TestReadTextWebsocketFrame recieve text websocket frame.
-func (suite *MessageRWTest) TestReadTextWebsocketFrame() {
+// TestNextTextWebsocketFrame recieve text websocket frame.
+func (suite *MessageRWTest) TestNextTextWebsocketFrame() {
 
 	// create test data
 	message := &Message{
@@ -183,14 +183,14 @@ func (suite *MessageRWTest) TestReadTextWebsocketFrame() {
 	binReader := NewBReaderFromWSReader(websocketReader)
 	reader := NewMessageReader(binReader)
 
-	actualMessage, err := reader.Read()
+	actualMessage, err := reader.Next()
 	suite.Require().NotNil(err)
 	suite.Require().Nil(actualMessage)
 }
 
-// TestReadMessageReturnsError If ReadMessage returns an error,
+// TestNextMessageReturnsError If ReadMessage returns an error,
 // make sure MessageReader returns the appropriate error.
-func (suite *MessageRWTest) TestReadMessageReturnsError() {
+func (suite *MessageRWTest) TestNextMessageReturnsError() {
 
 	// create test data
 	message := &Message{}
@@ -209,6 +209,6 @@ func (suite *MessageRWTest) TestReadMessageReturnsError() {
 	binReader := NewBReaderFromWSReader(websocketReader)
 	reader := NewMessageReader(binReader)
 
-	_, err = reader.Read()
+	_, err = reader.Next()
 	suite.Require().ErrorIs(err, expectedErr)
 }
