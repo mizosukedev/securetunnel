@@ -16,15 +16,17 @@ type MemoryStore struct {
 func (store *MemoryStore) Init() error {
 
 	store.tunnelTable = &dataTable[string, Tunnel]{
-		name:    "tunnel",
-		rwMutex: &sync.RWMutex{},
-		dataMap: map[string]Tunnel{},
+		name:     "tunnel",
+		rwMutex:  &sync.RWMutex{},
+		dataMap:  map[string]Tunnel{},
+		operator: &tunnelOperator{},
 	}
 
 	store.connectionTable = &dataTable[ConnectionID, Connection]{
-		name:    "connection",
-		rwMutex: &sync.RWMutex{},
-		dataMap: map[ConnectionID]Connection{},
+		name:     "connection",
+		rwMutex:  &sync.RWMutex{},
+		dataMap:  map[ConnectionID]Connection{},
+		operator: &connectionOperator{},
 	}
 
 	return nil
@@ -111,16 +113,17 @@ func (store *MemoryStore) DeleteConnection(connectionID ConnectionID) error {
 	return nil
 }
 
-type dataTableElement[TKey comparable] interface {
-	GetKey() TKey
-	GetRev() uint
-	SetRev(rev uint)
+type operator[TKey comparable, TElem any] interface {
+	GetKey(TElem) TKey
+	GetRev(TElem) uint
+	SetRev(elem *TElem, rev uint)
 }
 
-type dataTable[TKey comparable, TElem dataTableElement[TKey]] struct {
-	name    string
-	rwMutex *sync.RWMutex
-	dataMap map[TKey]TElem
+type dataTable[TKey comparable, TElem any] struct {
+	name     string
+	rwMutex  *sync.RWMutex
+	dataMap  map[TKey]TElem
+	operator operator[TKey, TElem]
 }
 
 func (table *dataTable[TKey, TElem]) getWithKey(key TKey) (TElem, bool) {
@@ -158,12 +161,14 @@ func (table *dataTable[TKey, TElem]) add(value TElem) error {
 	table.rwMutex.Lock()
 	defer table.rwMutex.Unlock()
 
-	_, ok := table.dataMap[value.GetKey()]
+	key := table.operator.GetKey(value)
+
+	_, ok := table.dataMap[key]
 	if ok {
-		return fmt.Errorf("%s data has already existed. key=%v", table.name, value.GetKey())
+		return fmt.Errorf("%s data has already existed. key=%v", table.name, key)
 	}
 
-	table.dataMap[value.GetKey()] = value
+	table.dataMap[key] = value
 
 	return nil
 }
@@ -173,17 +178,22 @@ func (table *dataTable[TKey, TElem]) update(value TElem) error {
 	table.rwMutex.Lock()
 	defer table.rwMutex.Unlock()
 
-	target, ok := table.dataMap[value.GetKey()]
+	key := table.operator.GetKey(value)
+
+	target, ok := table.dataMap[key]
 	if !ok {
-		return fmt.Errorf("%s data not found. key=%v", table.name, value.GetKey())
+		return fmt.Errorf("%s data not found. key=%v", table.name, key)
 	}
 
-	if target.GetRev() != value.GetRev() {
-		return fmt.Errorf("%s data update conflict. key=%v", table.name, value.GetKey())
+	targetRev := table.operator.GetRev(target)
+	currentRev := table.operator.GetRev(value)
+
+	if targetRev != currentRev {
+		return fmt.Errorf("%s data update conflict. key=%v", table.name, key)
 	}
 
-	value.SetRev(value.GetRev() + 1)
-	table.dataMap[value.GetKey()] = value
+	table.operator.SetRev(&value, targetRev+1)
+	table.dataMap[key] = value
 
 	return nil
 }
@@ -194,4 +204,34 @@ func (table *dataTable[TKey, TElem]) delete(key TKey) {
 	defer table.rwMutex.Unlock()
 
 	delete(table.dataMap, key)
+}
+
+type tunnelOperator struct {
+}
+
+func (*tunnelOperator) GetKey(elem Tunnel) string {
+	return elem.ID
+}
+
+func (*tunnelOperator) GetRev(elem Tunnel) uint {
+	return elem.Rev
+}
+
+func (*tunnelOperator) SetRev(elem *Tunnel, rev uint) {
+	elem.Rev = rev
+}
+
+type connectionOperator struct {
+}
+
+func (*connectionOperator) GetKey(elem Connection) ConnectionID {
+	return elem.ID
+}
+
+func (*connectionOperator) GetRev(elem Connection) uint {
+	return elem.Rev
+}
+
+func (*connectionOperator) SetRev(elem *Connection, rev uint) {
+	elem.Rev = rev
 }

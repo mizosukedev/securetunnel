@@ -35,19 +35,6 @@ type Tunnel struct {
 	LastUpdatedAt    time.Time
 }
 
-func (tunnel Tunnel) GetKey() string {
-	return tunnel.ID
-}
-
-func (tunnel Tunnel) GetRev() uint {
-	return tunnel.Rev
-}
-
-func (tunnel Tunnel) SetRev(rev uint) {
-	//lint:ignore SA4005 dataTableElement interface
-	tunnel.Rev = rev
-}
-
 func (tunnel Tunnel) Peer(mode aws.Mode) *Peer {
 
 	switch mode {
@@ -105,17 +92,4 @@ type Connection struct {
 	InterServerNetwork string // for scaling
 	InterServerAddress string // for scaling
 	LastUpdatedAt      time.Time
-}
-
-func (connection Connection) GetKey() ConnectionID {
-	return connection.ID
-}
-
-func (connection Connection) GetRev() uint {
-	return connection.Rev
-}
-
-func (connection Connection) SetRev(rev uint) {
-	//lint:ignore SA4005 dataTableElement interface
-	connection.Rev = rev
 }
